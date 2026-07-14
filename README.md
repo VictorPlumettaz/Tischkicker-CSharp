@@ -8,7 +8,12 @@ JavaScript.
 ## Funktionen
 
 - **Teamverwaltung** (Name, Spieler, ELO-Startwert 1000).
-- **Turniere**: Liga (jeder gegen jeden), K.o., Gruppen + K.o.
+- **Turniere anlegen & verwalten**: Formate Liga (jeder gegen jeden), K.o.,
+  Gruppen + K.o.; MIRA schlägt anhand der Teamzahl ein Format vor. Bestehende
+  Turniere lassen sich **bearbeiten** (Name/Halbzeiten/Spielzeit jederzeit;
+  Teams/Format nur, solange noch nicht gespielt wurde), **zurücksetzen** (alle
+  Ergebnisse löschen, Spiele wieder auf „geplant", ELO/Bilanz zurückrechnen)
+  und **löschen**.
 - **Spielerfassung** mit Spieluhr (Start/Pause/Fortsetzen), Halbzeiten,
   Tor-Buttons; **Uhr-Korrektur** (±10 s / ±1 min) und **Ergebnis-Korrektur**
   nachträglich (Tabelle und ELO werden neu berechnet).
@@ -16,7 +21,8 @@ JavaScript.
   Tiebreakern (Punkte → Tordifferenz → Tore → Team-ID).
 - **Live-Anzeigetafel** (`/live`, schwarzer Hintergrund): großes Ergebnis,
   Tor-Animation, gelegentlich rollender Ball, **live gekoppelte Tabelle**,
-  **Siegerehrung** am Turnierende.
+  **Siegerehrung** am Turnierende. Läuft gerade kein Spiel, zeigt die Tafel
+  **Tabelle + Spielplan** (nach Gruppe/Runde gegliedert, nächstes Spiel markiert).
 - **MIRA**:
   - **Stufe A** – Offline-Spruch-Engine (immer verfügbar).
   - **Stufe B** – frei formulierte Kommentare über die **Claude API**
@@ -31,7 +37,7 @@ JavaScript.
 | `Tischkicker.Data` | EF Core + SQLite (`AppDbContext`, Entities, Migrationen) |
 | `Tischkicker.Services` | `MatchControl`, `TournamentSetup`, `SettingsService`, `MiraService`, `LiveNotifier` |
 | `Tischkicker.Web` | ASP.NET Core + Blazor Server (Bedien-Oberfläche + `/live`) |
-| `Tischkicker.Tests` | xUnit (26 Tests) |
+| `Tischkicker.Tests` | xUnit (28 Tests) |
 
 **Echtzeit**: statt SSE ein Singleton `LiveNotifier` (C#-Event). Steuer-Aktionen
 lösen es aus; die Live-Komponente rendert neu, der Blazor-Server-Circuit pusht
@@ -55,15 +61,23 @@ Beispieldaten für eine Generalprobe befüllen (und beenden):
 dotnet run --project src/Tischkicker.Web -- --seed
 ```
 
-## Als Windows-`.exe` verpacken
+## Als Windows-`.exe` verpacken & weitergeben
 
 ```
 dotnet publish src/Tischkicker.Web -c Release -o publish
 ```
 
-Ergebnis: eine einzelne, eigenständige **`publish/Tischkicker.exe`**
-(win-x64, self-contained, kein installiertes .NET nötig). Starten per
-Doppelklick oder `Tischkicker.exe`; die Konsole zeigt die LAN-URLs.
+Ergebnis im Ordner `publish/`: eine eigenständige **`Tischkicker.exe`**
+(win-x64, self-contained, kein installiertes .NET nötig). Beim Start öffnet
+sich automatisch der Browser (abschaltbar mit `Tischkicker.exe --no-browser`);
+die Konsole zeigt zusätzlich die LAN-URLs.
+
+**Zum Verschicken den kompletten `publish/`-Ordner als ZIP packen** – nicht nur
+die `.exe`: sie braucht das Static-Assets-Manifest
+(`Tischkicker.staticwebassets.endpoints.json`) und `wwwroot/` daneben, sonst
+startet sie nicht. Der Empfänger entpackt und startet die `Tischkicker.exe`
+(Windows 64-bit; ggf. einmal SmartScreen „Trotzdem ausführen" und die
+Firewall-Abfrage bestätigen).
 
 ## MIRA Stufe B einrichten
 
