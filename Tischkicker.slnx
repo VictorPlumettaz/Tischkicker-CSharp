@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tischkicker.Core/Tischkicker.Core.csproj" />
+    <Project Path="src/Tischkicker.Data/Tischkicker.Data.csproj" />
+    <Project Path="src/Tischkicker.Services/Tischkicker.Services.csproj" />
+    <Project Path="src/Tischkicker.Web/Tischkicker.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tischkicker.Tests/Tischkicker.Tests.csproj" />
+  </Folder>
+</Solution>
