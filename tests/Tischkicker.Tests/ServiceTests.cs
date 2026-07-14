@@ -254,6 +254,36 @@ public class TournamentSetupServiceTests : IDisposable
     }
 
     [Fact]
+    public void Finish_KnockoutDraw_ThrowsUntilWinner()
+    {
+        var ids = Teams(2);
+        var t = _setup.CreateTournament("KO", TournamentFormat.Knockout, 1, 360);
+        _setup.SetTeams(t.Id, ids);
+        var final = _setup.Generate(t.Id).Single();
+
+        _control.Start(final.Id, MatchControl.NowMs());
+        // 0:0 → im K.o. nicht beendbar (Golden Goal).
+        Assert.Throws<MatchControlException>(() => _control.Finish(final.Id, MatchControl.NowMs()));
+
+        // Nach einem Tor lässt sich das Spiel beenden.
+        _control.AdjustScore(final.Id, "a", 1);
+        Assert.Equal(MatchStatus.Finished, _control.Finish(final.Id, MatchControl.NowMs()).Status);
+    }
+
+    [Fact]
+    public void Finish_LeagueDraw_Allowed()
+    {
+        var ids = Teams(2);
+        var t = _setup.CreateTournament("Liga", TournamentFormat.RoundRobin, 1, 360);
+        _setup.SetTeams(t.Id, ids);
+        var m = _setup.Generate(t.Id).First();
+
+        _control.Start(m.Id, MatchControl.NowMs());
+        // 0:0 in der Liga ist ein gültiges Remis.
+        Assert.Equal(MatchStatus.Finished, _control.Finish(m.Id, MatchControl.NowMs()).Status);
+    }
+
+    [Fact]
     public void KnockoutPhase_FromFinishedGroups_WiresFinal()
     {
         var ids = Teams(8);

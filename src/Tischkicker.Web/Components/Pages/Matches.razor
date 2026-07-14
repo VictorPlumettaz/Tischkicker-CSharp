@@ -52,6 +52,9 @@ else
     var finished = m.Status == MatchStatus.Finished;
     var remaining = MatchClock.RemainingSeconds(new ClockState(m.ElapsedSec, m.TimerRunning, m.TimerStartedAtMs), half, MatchControl.NowMs());
     var expired = remaining <= 0;
+    var isKo = _tournament?.Format == TournamentFormat.Knockout
+        || (_tournament?.Format == TournamentFormat.Groups && m.GroupName is null);
+    var goldenGoal = isKo && !finished && m.ScoreA == m.ScoreB;
 
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
         <button class="btn-ghost" @onclick="Back">← Übersicht</button>
@@ -85,7 +88,7 @@ else
         @if (!finished && m.Status == MatchStatus.Live && m.TimerRunning) { <button class="btn-aw" @onclick="() => Act(() => Control.Pause(m.Id, MatchControl.NowMs()))">⏸ Pause</button> }
         @if (!finished && m.Status == MatchStatus.Live && !m.TimerRunning) { <button class="btn-aw" @onclick="() => Act(() => Control.Resume(m.Id, MatchControl.NowMs()))">▶ Fortsetzen</button> }
         @if (!finished && halves > 1 && m.CurrentHalf < halves) { <button class="btn-aw" @onclick="() => Act(() => Control.NextHalf(m.Id, MatchControl.NowMs()))">⇄ Nächste Halbzeit</button> }
-        @if (!finished) { <button class="btn-danger" @onclick="() => Act(() => Control.Finish(m.Id, MatchControl.NowMs()))">⏹ Spiel beenden</button> }
+        @if (!finished) { <button class="btn-danger" disabled="@goldenGoal" @onclick="() => Act(() => Control.Finish(m.Id, MatchControl.NowMs()))">⏹ Spiel beenden</button> }
         @if (finished)
         {
             <div class="card" style="margin:0">Endstand: @Name(m.TeamAId) @m.ScoreA : @m.ScoreB @Name(m.TeamBId)</div>
@@ -93,6 +96,7 @@ else
         }
     </div>
     @if (finished && _correcting) { <p class="muted" style="margin-top:0.75rem">Passe den Endstand über die +/-‑Buttons an. Tabelle und ELO werden neu berechnet.</p> }
+    @if (goldenGoal) { <p class="muted" style="margin-top:0.75rem">⚽ <strong>Golden Goal</strong> – im K.o. muss ein Sieger her. Weiterspielen, bis ein Team trifft; danach lässt sich das Spiel beenden.</p> }
 }
 
 @code {

@@ -99,12 +99,27 @@ public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifi
         return Commit(db, m);
     }
 
+    /// <summary>
+    /// Ein K.o.-Spiel braucht einen Sieger: reines K.o.-Turnier oder die K.o.-Phase
+    /// eines Gruppen-Turniers (Match ohne Gruppe). Liga/Gruppenphase = Remis erlaubt.
+    /// </summary>
+    private static bool IsKnockoutMatch(AppDbContext db, Match m)
+    {
+        var t = db.Tournaments.Find(m.TournamentId);
+        return t is not null && (t.Format == TournamentFormat.Knockout
+            || (t.Format == TournamentFormat.Groups && m.GroupName is null));
+    }
+
     /// <summary>Beendet das Spiel und verbucht Bilanz + ELO (idempotent).</summary>
     public Match Finish(int id, long nowMs)
     {
         using var db = dbf.CreateDbContext();
         var m = Require(db, id);
         if (m.Status == MatchStatus.Finished) return m;
+
+        if (m.ScoreA == m.ScoreB && IsKnockoutMatch(db, m))
+            throw new MatchControlException(
+                "K.o.-Spiel kann nicht unentschieden enden – Golden Goal: weiterspielen, bis ein Team trifft.");
 
         ApplyClock(m, MatchClock.Pause(ClockOf(m), nowMs));
         m.Status = MatchStatus.Finished;
