@@ -182,6 +182,20 @@ public class TournamentSetupServiceTests : IDisposable
     }
 
     [Fact]
+    public void UpdateTournament_ChangesNameFormatAndClock()
+    {
+        var t = _setup.CreateTournament("Alt", TournamentFormat.RoundRobin, 1, 360);
+        _setup.UpdateTournament(t.Id, "Neu", TournamentFormat.Groups, 2, 300);
+
+        using var db = _dbf.CreateDbContext();
+        var updated = db.Tournaments.Find(t.Id)!;
+        Assert.Equal("Neu", updated.Name);
+        Assert.Equal(TournamentFormat.Groups, updated.Format);
+        Assert.Equal(2, updated.Halves);
+        Assert.Equal(300, updated.HalfDurationSec);
+    }
+
+    [Fact]
     public void KnockoutPhase_FromFinishedGroups_WiresFinal()
     {
         var ids = Teams(8);

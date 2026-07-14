@@ -32,6 +32,21 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         return t;
     }
 
+    /// <summary>Aktualisiert die Stammdaten eines Turniers (Name, Format, Halbzeiten, Dauer).</summary>
+    public Tournament UpdateTournament(int tournamentId, string name, TournamentFormat format, int halves, int halfDurationSec)
+    {
+        using var db = dbf.CreateDbContext();
+        var t = db.Tournaments.Find(tournamentId)
+            ?? throw new TournamentSetupException("Turnier nicht gefunden.");
+        t.Name = name.Trim();
+        t.Format = format;
+        t.Halves = halves is 1 or 2 ? halves : 1;
+        t.HalfDurationSec = halfDurationSec > 0 ? halfDurationSec : 360;
+        db.SaveChanges();
+        notifier.NotifyChanged();
+        return t;
+    }
+
     public void DeleteTournament(int tournamentId)
     {
         using var db = dbf.CreateDbContext();
