@@ -197,12 +197,13 @@
 
         _champion = ComputeChampion(activeTid);
 
+        // Tor-Animation sofort auslösen – vor dem evtl. langsamen KI-Aufruf.
+        DetectGoal(_current);
+
         // MIRA-Kommentar bei Spielübergängen.
         var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name);
         _prevForMira = _current;
         if (ctx is not null) _miraText = await Mira.CommentAsync(ctx);
-
-        DetectGoal(_current);
     }
 
     private (int, int?)? ComputeChampion(int? activeTid)

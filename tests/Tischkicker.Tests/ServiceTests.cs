@@ -225,6 +225,35 @@ public class TournamentSetupServiceTests : IDisposable
     }
 
     [Fact]
+    public void ResetResults_Knockout_PreservesByeTeams()
+    {
+        // 3 Teams → K.o. mit einem Freilos: ein Team ist im Finale vorbelegt.
+        var ids = Teams(3);
+        var t = _setup.CreateTournament("KO", TournamentFormat.Knockout, 1, 360);
+        _setup.SetTeams(t.Id, ids);
+        var matches = _setup.Generate(t.Id);
+
+        var final = matches.Single(m => m.NextMatchId == null);
+        var r1 = matches.Single(m => m.NextMatchId != null);
+        var byeSlot = final.TeamAId is not null ? "a" : "b";
+        var byeTeam = final.TeamAId ?? final.TeamBId;
+        Assert.NotNull(byeTeam);
+
+        // Runde 1 spielen → Sieger rückt ins Finale (in den anderen Slot).
+        _control.AdjustScore(r1.Id, "a", 1);
+        _control.Finish(r1.Id, MatchControl.NowMs());
+
+        _setup.ResetResults(t.Id);
+
+        using var db = _dbf.CreateDbContext();
+        var f = db.Matches.Find(final.Id)!;
+        var stillBye = byeSlot == "a" ? f.TeamAId : f.TeamBId;
+        var fed = byeSlot == "a" ? f.TeamBId : f.TeamAId;
+        Assert.Equal(byeTeam, stillBye); // Freilos-Team bleibt erhalten
+        Assert.Null(fed);                // nur der durchs Vorrücken befüllte Slot ist leer
+    }
+
+    [Fact]
     public void KnockoutPhase_FromFinishedGroups_WiresFinal()
     {
         var ids = Teams(8);

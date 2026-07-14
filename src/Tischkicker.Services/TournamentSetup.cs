@@ -72,9 +72,15 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
             }
         }
 
-        // Matches, deren Teams erst durchs Vorrücken gesetzt werden → Slots leeren.
-        var fedMatchIds = matches.Where(m => m.NextMatchId is not null)
-            .Select(m => m.NextMatchId!.Value).ToHashSet();
+        // Nur Slots leeren, die erst durchs Vorrücken befüllt werden (aus NextSlot der
+        // zubringenden Spiele). Vorbelegte Freilos-Slots bleiben erhalten.
+        var fedSlots = new Dictionary<int, HashSet<string>>();
+        foreach (var m in matches.Where(m => m.NextMatchId is not null && m.NextSlot is not null))
+        {
+            if (!fedSlots.TryGetValue(m.NextMatchId!.Value, out var slots))
+                fedSlots[m.NextMatchId!.Value] = slots = [];
+            slots.Add(m.NextSlot!);
+        }
 
         foreach (var m in matches)
         {
@@ -87,7 +93,11 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
             m.TimerStartedAtMs = null;
             m.StartedAt = null;
             m.FinishedAt = null;
-            if (fedMatchIds.Contains(m.Id)) { m.TeamAId = null; m.TeamBId = null; }
+            if (fedSlots.TryGetValue(m.Id, out var clear))
+            {
+                if (clear.Contains("a")) m.TeamAId = null;
+                if (clear.Contains("b")) m.TeamBId = null;
+            }
         }
 
         tournament.Status = TournamentStatus.Running;

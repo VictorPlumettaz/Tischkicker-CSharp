@@ -124,7 +124,7 @@ else
 
         <div class="card" style="display:flex; gap:1.5rem; flex-wrap:wrap">
             <div><label class="muted">Format</label><br />
-                <select @bind="_format">
+                <select @bind="_format" @bind:after="() => _overridden = true">
                     <option value="@TournamentFormat.RoundRobin">Liga (jeder gegen jeden)</option>
                     <option value="@TournamentFormat.Groups">Gruppen + K.o.</option>
                     <option value="@TournamentFormat.Knockout">K.o.-System</option>
