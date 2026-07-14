@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.EntityFrameworkCore;
@@ -63,5 +64,22 @@ Console.WriteLine($"[Tischkicker] Bediener-Oberflaeche: http://localhost:{Port}"
 foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName()))
     if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
         Console.WriteLine($"[Tischkicker] Anzeigetafel (TV/Tablet):  http://{ip}:{Port}/live");
+
+// Beim Start automatisch den Standardbrowser öffnen (mit --no-browser abschaltbar).
+if (!args.Contains("--no-browser"))
+{
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = $"http://localhost:{Port}",
+                UseShellExecute = true,
+            });
+        }
+        catch { /* Browser-Start ist optional – die App läuft auch ohne. */ }
+    });
+}
 
 app.Run();
