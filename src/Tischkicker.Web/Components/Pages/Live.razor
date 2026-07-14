@@ -56,10 +56,35 @@
             }
             else
             {
-                <div style="text-align:center">
-                    <div style="font-size:3rem; font-weight:700; opacity:0.8">Bereit für den Anpfiff</div>
-                    @if (_next is { } n) { <div style="font-size:1.75rem; opacity:0.6; margin-top:1rem">@Name(n.TeamAId) vs. @Name(n.TeamBId)</div> }
-                </div>
+                var plan = _activeTid is { } tid2 ? _matches.Where(m => m.TournamentId == tid2).ToList() : [];
+                if (plan.Count == 0)
+                {
+                    <div style="text-align:center">
+                        <div style="font-size:3rem; font-weight:700; opacity:0.8">Bereit für den Anpfiff</div>
+                        @if (_next is { } n) { <div style="font-size:1.75rem; opacity:0.6; margin-top:1rem">@Name(n.TeamAId) vs. @Name(n.TeamBId)</div> }
+                    </div>
+                }
+                else
+                {
+                    <div class="idle-wrap">
+                        <div class="idle-hint">Spielplan ⚽</div>
+                        <div class="plan">
+                            @foreach (var sec in BuildPlan(plan))
+                            {
+                                @if (sec.Header is not null) { <h4>@sec.Header</h4> }
+                                @foreach (var pm in sec.Rows)
+                                {
+                                    var done = pm.Status == MatchStatus.Finished;
+                                    <div class="plan-row @(done ? "done" : "") @(pm.Id == _next?.Id ? "next" : "")">
+                                        <span class="pl-team">@Name(pm.TeamAId)</span>
+                                        <span class="pl-score">@(done ? $"{pm.ScoreA}:{pm.ScoreB}" : "–")</span>
+                                        <span class="pl-team r">@Name(pm.TeamBId)</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
             }
         </section>
 
@@ -125,6 +150,7 @@
     private StandingsResponse? _standings;
     private Match? _current, _next;
     private Tournament? _currentTournament;
+    private int? _activeTid;
     private HashSet<int> _currentIds = [];
     private List<Match> _upcoming = [];
     private (int WinnerId, int? RunnerId)? _champion;
@@ -162,6 +188,7 @@
 
         var activeTid = _current?.TournamentId ?? _next?.TournamentId
             ?? _tournaments.FirstOrDefault(t => _matches.Any(m => m.TournamentId == t.Id))?.Id;
+        _activeTid = activeTid;
         _currentTournament = _tournaments.FirstOrDefault(t => t.Id == activeTid);
         _standings = activeTid is { } tid ? Setup.GetStandings(tid) : null;
 
@@ -219,6 +246,46 @@
     }
 
     private string Name(int? id) => id is { } i && _names.TryGetValue(i, out var n) ? n : "—";
+
+    /// <summary>Gliedert den Spielplan: Gruppen → je Gruppe (+ K.o.), K.o. → je Runde, Liga → flach.</summary>
+    private List<(string? Header, List<Match> Rows)> BuildPlan(List<Match> plan)
+    {
+        var sections = new List<(string?, List<Match>)>();
+        var fmt = _currentTournament?.Format;
+
+        if (fmt == TournamentFormat.Groups)
+        {
+            foreach (var g in plan.Where(m => m.GroupName != null).GroupBy(m => m.GroupName!).OrderBy(g => g.Key))
+                sections.Add(($"Gruppe {g.Key}", g.OrderBy(m => m.Id).ToList()));
+            var ko = plan.Where(m => m.GroupName == null).OrderBy(m => m.Round).ThenBy(m => m.Id).ToList();
+            if (ko.Count > 0)
+                foreach (var r in ko.GroupBy(m => m.Round ?? 0).OrderBy(g => g.Key))
+                    sections.Add((RoundLabel(r.Key, ko), r.OrderBy(m => m.Id).ToList()));
+        }
+        else if (fmt == TournamentFormat.Knockout)
+        {
+            foreach (var r in plan.GroupBy(m => m.Round ?? 0).OrderBy(g => g.Key))
+                sections.Add((RoundLabel(r.Key, plan), r.OrderBy(m => m.Id).ToList()));
+        }
+        else
+        {
+            sections.Add((null, plan.OrderBy(m => m.Round ?? 0).ThenBy(m => m.Id).ToList()));
+        }
+        return sections;
+    }
+
+    /// <summary>Runden-Beschriftung im K.o. (Finale/Halbfinale/Viertelfinale, sonst „Runde N").</summary>
+    private static string RoundLabel(int round, List<Match> bracket)
+    {
+        var max = bracket.Count > 0 ? bracket.Max(m => m.Round ?? 0) : round;
+        return (max - round) switch
+        {
+            0 => "Finale",
+            1 => "Halbfinale",
+            2 => "Viertelfinale",
+            _ => $"Runde {round}",
+        };
+    }
 
     private static string FormatClock(double totalSec)
     {

@@ -82,6 +82,19 @@ table.data td, table.data th { padding: 0.5rem 0.75rem; border-bottom: 1px solid
 .live-table tr.hl { color: var(--aw-accent); font-weight: 700; }
 .side-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--aw-accent); font-weight: 700; margin-bottom: 0.5rem; }
 
+/* Ruhe-Ansicht: Spielplan (Tabelle steht in der Seitenspalte) */
+.idle-wrap { width: 100%; max-width: 54rem; display: flex; flex-direction: column; max-height: 100%; }
+.idle-hint { text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.05em; color: var(--aw-accent); margin-bottom: 1rem; }
+.plan { overflow: auto; padding-right: 0.5rem; }
+.plan h4 { margin: 1rem 0 0.35rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.45); }
+.plan-row { display: grid; grid-template-columns: 1fr 4.5rem 1fr; align-items: center; gap: 0.75rem; padding: 0.45rem 0.75rem; font-size: 1.4rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.plan-row .pl-team { text-align: right; opacity: 0.7; }
+.plan-row .pl-team.r { text-align: left; }
+.plan-row .pl-score { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; color: rgba(255,255,255,0.45); }
+.plan-row.done .pl-team { opacity: 1; }
+.plan-row.done .pl-score { color: var(--aw-accent); }
+.plan-row.next { outline: 2px solid var(--aw-accent); border-radius: 0.5rem; border-bottom-color: transparent; }
+
 /* Siegerehrung */
 .ceremony { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .trophy { font-size: clamp(5rem, 12vw, 10rem); line-height: 1; }

@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Tischkicker.Core;
 using Tischkicker.Core.Domain;
 using Tischkicker.Data;
 using Tischkicker.Services;
@@ -193,6 +194,34 @@ public class TournamentSetupServiceTests : IDisposable
         Assert.Equal(TournamentFormat.Groups, updated.Format);
         Assert.Equal(2, updated.Halves);
         Assert.Equal(300, updated.HalfDurationSec);
+    }
+
+    [Fact]
+    public void ResetResults_ClearsMatchesAndRevertsElo()
+    {
+        var ids = Teams(4);
+        var t = _setup.CreateTournament("Liga", TournamentFormat.RoundRobin, 1, 360);
+        _setup.SetTeams(t.Id, ids);
+        var matches = _setup.Generate(t.Id);
+        foreach (var m in matches)
+        {
+            _control.AdjustScore(m.Id, "a", 2);
+            _control.Finish(m.Id, MatchControl.NowMs());
+        }
+        // Nach dem Spielen: ELO hat sich verschoben.
+        using (var db = _dbf.CreateDbContext())
+            Assert.Contains(db.Teams, x => x.Elo != Elo.DefaultElo);
+
+        _setup.ResetResults(t.Id);
+        _control.RecomputeStats();
+
+        using var db2 = _dbf.CreateDbContext();
+        var reset = db2.Matches.Where(m => m.TournamentId == t.Id).ToList();
+        Assert.All(reset, m => Assert.Equal(MatchStatus.Scheduled, m.Status));
+        Assert.All(reset, m => Assert.Equal(0, m.ScoreA + m.ScoreB));
+        // ELO/Bilanz wieder auf Startwert (nur dieses Turnier existierte).
+        Assert.All(db2.Teams, x => Assert.Equal(Elo.DefaultElo, x.Elo));
+        Assert.All(db2.Teams, x => Assert.Equal(0, x.Wins + x.Losses + x.Draws));
     }
 
     [Fact]

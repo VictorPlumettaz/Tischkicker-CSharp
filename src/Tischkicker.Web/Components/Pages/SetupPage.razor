@@ -1,6 +1,8 @@
 @page "/setup"
 @inject IDbContextFactory<AppDbContext> Dbf
 @inject TournamentSetup Setup
+@inject MatchControl Control
+@inject IJSRuntime JS
 
 <PageTitle>Turnier-Setup</PageTitle>
 <h1>Turnier-Setup</h1>
@@ -75,6 +77,7 @@ else
                         <td><strong>@t.Name</strong> <span class="muted">· @FormatLabel(t.Format) · @t.Status</span></td>
                         <td style="text-align:right; white-space:nowrap">
                             <button class="btn-ghost" @onclick="() => EditOpen(t)">Bearbeiten</button>
+                            <button class="btn-ghost" @onclick="() => Reset(t)">Zurücksetzen</button>
                             <button class="btn-link-danger" @onclick="() => Delete(t)">Löschen</button>
                         </td>
                     </tr>
@@ -251,6 +254,21 @@ else
     private void ResetForm()
     {
         _generated = null; _selected.Clear(); _name = ""; _overridden = false; _recommendation = null;
+    }
+
+    private async Task Reset(Tournament t)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm",
+            $"Turnier \"{t.Name}\" zurücksetzen? Alle Ergebnisse werden gelöscht und die Spiele wieder auf geplant gesetzt (ELO/Statistik werden zurückgerechnet). Eine erzeugte K.o.-Phase wird entfernt."))
+            return;
+        try
+        {
+            Setup.ResetResults(t.Id);   // Spiele zurücksetzen
+            Control.RecomputeStats();   // ELO/Bilanz neu berechnen
+            _error = null;
+            await Load();
+        }
+        catch (Exception e) { _error = e.Message; }
     }
 
     private async Task Delete(Tournament t)

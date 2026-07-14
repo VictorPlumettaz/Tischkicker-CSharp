@@ -47,6 +47,54 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         return t;
     }
 
+    /// <summary>
+    /// Setzt ein Turnier zurück: alle Ergebnisse gelöscht, Spiele wieder auf „geplant"
+    /// (0:0, Uhr/Halbzeit zurück). Bei Gruppen-Turnieren wird eine bereits erzeugte
+    /// K.o.-Phase entfernt; in K.o.-Bäumen werden vorgerückte Teams geleert. ELO/Bilanz
+    /// anschließend über <see cref="MatchControl.RecomputeStats"/> neu berechnen.
+    /// </summary>
+    public void ResetResults(int tournamentId)
+    {
+        using var db = dbf.CreateDbContext();
+        var tournament = db.Tournaments.Find(tournamentId)
+            ?? throw new TournamentSetupException("Turnier nicht gefunden.");
+
+        var matches = db.Matches.Where(m => m.TournamentId == tournamentId).ToList();
+
+        // Gruppen-Turnier: erzeugte K.o.-Phase (ohne GroupName) wieder entfernen.
+        if (tournament.Format == TournamentFormat.Groups)
+        {
+            var bracket = matches.Where(m => m.GroupName == null).ToList();
+            if (bracket.Count > 0)
+            {
+                db.Matches.RemoveRange(bracket);
+                matches = matches.Where(m => m.GroupName != null).ToList();
+            }
+        }
+
+        // Matches, deren Teams erst durchs Vorrücken gesetzt werden → Slots leeren.
+        var fedMatchIds = matches.Where(m => m.NextMatchId is not null)
+            .Select(m => m.NextMatchId!.Value).ToHashSet();
+
+        foreach (var m in matches)
+        {
+            m.ScoreA = 0;
+            m.ScoreB = 0;
+            m.Status = MatchStatus.Scheduled;
+            m.CurrentHalf = 1;
+            m.ElapsedSec = 0;
+            m.TimerRunning = false;
+            m.TimerStartedAtMs = null;
+            m.StartedAt = null;
+            m.FinishedAt = null;
+            if (fedMatchIds.Contains(m.Id)) { m.TeamAId = null; m.TeamBId = null; }
+        }
+
+        tournament.Status = TournamentStatus.Running;
+        db.SaveChanges();
+        notifier.NotifyChanged();
+    }
+
     public void DeleteTournament(int tournamentId)
     {
         using var db = dbf.CreateDbContext();
