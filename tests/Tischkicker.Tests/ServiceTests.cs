@@ -92,6 +92,57 @@ public class MatchControlServiceTests : IDisposable
     public void Dispose() => _dbf.Dispose();
 }
 
+public class SettingsServiceTests : IDisposable
+{
+    private readonly TestDbFactory _dbf = new();
+    private readonly SettingsService _settings;
+
+    public SettingsServiceTests() => _settings = new SettingsService(_dbf);
+
+    [Fact]
+    public void Defaults_StageBOffNoKeyDefaultModel()
+    {
+        var cfg = _settings.GetMiraConfig();
+        Assert.False(cfg.StageBEnabled);
+        Assert.Equal("", cfg.ApiKey);
+        Assert.Equal(SettingsService.DefaultModel, cfg.Model);
+    }
+
+    [Fact]
+    public void SetMiraConfig_StoresAndHidesKey()
+    {
+        _settings.SetMiraConfig(stageBEnabled: true, model: "claude-sonnet-5", apiKey: "sk-ant-secret");
+
+        var cfg = _settings.GetMiraConfig();
+        Assert.True(cfg.StageBEnabled);
+        Assert.Equal("claude-sonnet-5", cfg.Model);
+        Assert.Equal("sk-ant-secret", cfg.ApiKey);
+
+        // Nach außen ist der Key nie sichtbar, nur HasApiKey.
+        var pub = _settings.GetMiraConfigPublic();
+        Assert.True(pub.HasApiKey);
+        Assert.Equal("claude-sonnet-5", pub.Model);
+    }
+
+    [Fact]
+    public void SetMiraConfig_EmptyKeyKeepsExisting_ClearRemoves()
+    {
+        _settings.SetMiraConfig(apiKey: "sk-ant-keep");
+        _settings.SetMiraConfig(apiKey: "   ");           // leer → behalten
+        Assert.Equal("sk-ant-keep", _settings.GetMiraConfig().ApiKey);
+
+        _settings.SetMiraConfig(clearApiKey: true);       // entfernen
+        Assert.Equal("", _settings.GetMiraConfig().ApiKey);
+        Assert.False(_settings.GetMiraConfigPublic().HasApiKey);
+    }
+
+    [Fact]
+    public void SetMiraConfig_RejectsUnknownModel()
+        => Assert.Throws<ArgumentException>(() => _settings.SetMiraConfig(model: "gpt-4"));
+
+    public void Dispose() => _dbf.Dispose();
+}
+
 public class TournamentSetupServiceTests : IDisposable
 {
     private readonly TestDbFactory _dbf = new();

@@ -22,6 +22,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(o => o.UseSqlite($"Data Sourc
 builder.Services.AddSingleton<LiveNotifier>();
 builder.Services.AddScoped<MatchControl>();
 builder.Services.AddScoped<TournamentSetup>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<MiraService>();
 
 builder.Services.AddRazorComponents()

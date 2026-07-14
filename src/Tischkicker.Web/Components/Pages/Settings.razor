@@ -1,9 +1,112 @@
 @page "/settings"
+@inject SettingsService Cfg
+@inject MiraService Mira
 
 <PageTitle>Einstellungen</PageTitle>
 <h1>Einstellungen</h1>
 
 <div class="card">
     <h2 style="margin-top:0; font-size:1rem">MIRA – KI-Kommentare (Stufe B)</h2>
-    <p class="muted">Wird im nächsten Schritt ergänzt (Claude API + API-Key, mit automatischem Offline-Fallback auf Stufe A).</p>
+    <p class="muted">
+        Stufe A (Offline-Sprüche) läuft immer. Stufe B lässt MIRA die Live-Kommentare frei über die
+        Claude API formulieren. Fällt bei Problemen (kein Internet, ungültiger Key, Timeout) automatisch
+        auf Stufe A zurück. Der API-Key wird nur lokal gespeichert und nie angezeigt.
+    </p>
+
+    @if (_saved) { <div class="ok">✓ Gespeichert.</div> }
+    @if (_error is not null) { <div class="err">⚠️ @_error</div> }
+
+    <div style="display:flex; flex-direction:column; gap:1rem; max-width:32rem">
+        <label style="display:flex; align-items:center; gap:0.5rem">
+            <input type="checkbox" @bind="_stageBEnabled" />
+            <span>Stufe B aktivieren (Claude API)</span>
+        </label>
+
+        <label style="display:flex; flex-direction:column; gap:0.25rem">
+            <span class="muted">Modell</span>
+            <select @bind="_model">
+                @foreach (var m in SettingsService.MiraModels) { <option value="@m">@m</option> }
+            </select>
+        </label>
+
+        <label style="display:flex; flex-direction:column; gap:0.25rem">
+            <span class="muted">API-Key @(_hasApiKey ? "(hinterlegt – leer lassen, um zu behalten)" : "(noch keiner hinterlegt)")</span>
+            <input type="password" placeholder="@(_hasApiKey ? "••••••••••••••••" : "sk-ant-…")" @bind="_apiKey" autocomplete="off" />
+        </label>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center">
+            <button class="btn-aw" @onclick="Save">Speichern</button>
+            <button class="btn-ghost" @onclick="Test" disabled="@_testing">@(_testing ? "Teste…" : "Verbindung testen")</button>
+            @if (_hasApiKey) { <button class="btn-link-danger" @onclick="ClearKey">API-Key entfernen</button> }
+        </div>
+
+        @if (_testResult is not null)
+        {
+            <div class="@(_testOk ? "ok" : "err")">
+                @(_testOk ? "✓ Verbindung ok: " : "⚠️ Fehler: ")@_testResult
+            </div>
+        }
+    </div>
 </div>
+
+@code {
+    private bool _stageBEnabled;
+    private string _model = SettingsService.DefaultModel;
+    private string _apiKey = "";
+    private bool _hasApiKey;
+
+    private bool _saved;
+    private string? _error;
+    private bool _testing;
+    private bool _testOk;
+    private string? _testResult;
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        var cfg = Cfg.GetMiraConfigPublic();
+        _stageBEnabled = cfg.StageBEnabled;
+        _model = cfg.Model;
+        _hasApiKey = cfg.HasApiKey;
+    }
+
+    private void Save()
+    {
+        _saved = false; _error = null;
+        try
+        {
+            Cfg.SetMiraConfig(stageBEnabled: _stageBEnabled, model: _model,
+                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey);
+            _apiKey = "";
+            Load();
+            _saved = true;
+        }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private void ClearKey()
+    {
+        _error = null;
+        try { Cfg.SetMiraConfig(clearApiKey: true); _apiKey = ""; Load(); _saved = true; }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private async Task Test()
+    {
+        _testing = true; _testResult = null;
+        try
+        {
+            // Erst speichern, damit Umschalter/Modell/Key aktuell sind; dann echten Aufruf.
+            Cfg.SetMiraConfig(stageBEnabled: _stageBEnabled, model: _model,
+                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey);
+            _apiKey = "";
+            Load();
+            var (ok, text, err) = await Mira.TestConnectionAsync();
+            _testOk = ok;
+            _testResult = ok ? text : err;
+        }
+        catch (Exception e) { _testOk = false; _testResult = e.Message; }
+        finally { _testing = false; }
+    }
+}

@@ -173,7 +173,7 @@
         // MIRA-Kommentar bei Spielübergängen.
         var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name);
         _prevForMira = _current;
-        if (ctx is not null) _miraText = Mira.Comment(ctx);
+        if (ctx is not null) _miraText = await Mira.CommentAsync(ctx);
 
         DetectGoal(_current);
     }
