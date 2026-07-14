@@ -1,0 +1,90 @@
+@page "/rankings"
+@inject IDbContextFactory<AppDbContext> Dbf
+@inject TournamentSetup Setup
+
+<PageTitle>Rangliste</PageTitle>
+<h1>Rangliste</h1>
+
+@if (_error is not null) { <div class="err">⚠️ @_error</div> }
+
+<div class="card">
+    <h2 style="margin-top:0; font-size:1rem">ELO-Gesamtwertung</h2>
+    <table class="data">
+        <thead><tr><th style="width:2rem">#</th><th>Team</th><th style="text-align:right">ELO</th><th style="text-align:right">S/U/N</th></tr></thead>
+        <tbody>
+        @{ var rank = 1; }
+        @foreach (var t in _teams)
+        {
+            <tr><td class="muted">@(rank++)</td><td><strong>@t.Name</strong></td><td style="text-align:right; font-variant-numeric:tabular-nums">@t.Elo</td><td style="text-align:right">@t.Wins/@t.Draws/@t.Losses</td></tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+        <h2 style="margin:0; font-size:1rem">Turnier-Tabellen</h2>
+        <select @bind="_selectedId" @bind:after="LoadStandings">
+            <option value="0">Turnier wählen …</option>
+            @foreach (var t in _tournaments) { <option value="@t.Id">@t.Name</option> }
+        </select>
+        @if (_selected?.Format == TournamentFormat.Groups)
+        {
+            <button class="btn-ghost" @onclick="GenerateKnockout">K.o.-Phase erzeugen</button>
+        }
+    </div>
+
+    @if (_standings is not null)
+    {
+        @if (_standings.Groups.Count == 0) { <p class="muted">Keine Tabelle für dieses Format (K.o.).</p> }
+        @foreach (var g in _standings.Groups)
+        {
+            @if (g.GroupName is not null) { <h3 style="margin:0.75rem 0 0.25rem">Gruppe @g.GroupName</h3> }
+            <table class="data">
+                <thead><tr><th style="width:2rem">#</th><th>Team</th><th style="text-align:right">Sp</th><th style="text-align:right">Diff</th><th style="text-align:right">Pkt</th></tr></thead>
+                <tbody>
+                @{ var r = 1; }
+                @foreach (var row in g.Rows)
+                {
+                    <tr><td class="muted">@(r++)</td><td>@TeamName(row.TeamId)</td><td style="text-align:right">@row.Played</td><td style="text-align:right">@(row.GoalDiff > 0 ? "+" + row.GoalDiff : row.GoalDiff)</td><td style="text-align:right; font-weight:700">@row.Points</td></tr>
+                }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@code {
+    private List<Team> _teams = [];
+    private List<Tournament> _tournaments = [];
+    private Dictionary<int, string> _names = new();
+    private int _selectedId;
+    private Tournament? _selected;
+    private StandingsResponse? _standings;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _teams = await db.Teams.OrderByDescending(t => t.Elo).ToListAsync();
+        _tournaments = await db.Tournaments.OrderByDescending(t => t.CreatedAt).ToListAsync();
+        _names = await db.Teams.ToDictionaryAsync(t => t.Id, t => t.Name);
+    }
+
+    private string TeamName(int id) => _names.TryGetValue(id, out var n) ? n : $"#{id}";
+
+    private void LoadStandings()
+    {
+        _error = null;
+        _selected = _tournaments.FirstOrDefault(t => t.Id == _selectedId);
+        _standings = _selectedId == 0 ? null : Setup.GetStandings(_selectedId);
+    }
+
+    private async Task GenerateKnockout()
+    {
+        try { Setup.GenerateKnockoutPhase(_selectedId); _error = null; }
+        catch (Exception e) { _error = e.Message; }
+        await OnInitializedAsync();
+        LoadStandings();
+    }
+}

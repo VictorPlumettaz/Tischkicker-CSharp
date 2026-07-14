@@ -1,0 +1,149 @@
+@page "/setup"
+@inject IDbContextFactory<AppDbContext> Dbf
+@inject TournamentSetup Setup
+
+<PageTitle>Turnier-Setup</PageTitle>
+<h1>Turnier-Setup</h1>
+
+@if (_error is not null) { <div class="err">⚠️ @_error</div> }
+
+@if (_tournaments.Count > 0)
+{
+    <div class="card">
+        <h2 style="margin-top:0; font-size:1rem">Bestehende Turniere</h2>
+        <table class="data">
+            <tbody>
+            @foreach (var t in _tournaments)
+            {
+                <tr>
+                    <td><strong>@t.Name</strong> <span class="muted">· @FormatLabel(t.Format) · @t.Status</span></td>
+                    <td style="text-align:right"><button class="btn-link-danger" @onclick="() => Delete(t)">Löschen</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (_generated is not null)
+{
+    <div class="card" style="background:#f0fdf4">
+        ✅ Spielplan erzeugt (@_generated.Count Spiele). Weiter unter <a href="matches">Spiele</a>.
+        <button class="btn-ghost" style="margin-left:1rem" @onclick="ResetForm">+ Neues Turnier</button>
+    </div>
+}
+else
+{
+    <div class="card">
+        <label class="muted">Turniername</label><br />
+        <input @bind="_name" placeholder="z. B. A+W Sommerfest-Cup" style="width:100%; max-width:30rem" />
+    </div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between"><strong>Teams auswählen</strong><span class="muted">@_selected.Count gewählt</span></div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(12rem,1fr)); gap:0.5rem; margin-top:0.5rem">
+            @foreach (var t in _teams)
+            {
+                <label style="display:flex; gap:0.5rem; align-items:center; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.4rem 0.6rem; cursor:pointer">
+                    <input type="checkbox" checked="@_selected.Contains(t.Id)" @onchange="() => Toggle(t.Id)" /> @t.Name
+                </label>
+            }
+            @if (_teams.Count == 0) { <span class="muted">Keine Teams – lege sie zuerst unter „Teams" an.</span> }
+        </div>
+    </div>
+
+    @if (_recommendation is not null)
+    {
+        <div class="card" style="background:rgba(0,74,153,0.05)">
+            <strong style="color:var(--aw-blue)">MIRA empfiehlt: </strong>@FormatLabel(_recommendation.Value.Format)
+            <div class="muted">@_recommendation.Value.Reason</div>
+        </div>
+    }
+
+    <div class="card" style="display:flex; gap:1.5rem; flex-wrap:wrap">
+        <div><label class="muted">Format</label><br />
+            <select @bind="_format">
+                <option value="@TournamentFormat.RoundRobin">Liga (jeder gegen jeden)</option>
+                <option value="@TournamentFormat.Groups">Gruppen + K.o.</option>
+                <option value="@TournamentFormat.Knockout">K.o.-System</option>
+            </select>
+        </div>
+        <div><label class="muted">Halbzeiten</label><br />
+            <select @bind="_halves"><option value="1">1 Halbzeit</option><option value="2">2 Halbzeiten</option></select>
+        </div>
+        <div><label class="muted">Minuten je Halbzeit</label><br />
+            <input type="number" min="1" max="30" @bind="_minutes" style="width:6rem" />
+        </div>
+    </div>
+
+    <button class="btn-aw" disabled="@(!CanCreate)" @onclick="Create">Turnier anlegen &amp; Spielplan erzeugen</button>
+    @if (!CanCreate) { <p class="muted">Name eingeben und mindestens zwei Teams wählen.</p> }
+}
+
+@code {
+    private List<Team> _teams = [];
+    private List<Tournament> _tournaments = [];
+    private readonly HashSet<int> _selected = [];
+    private string _name = "";
+    private TournamentFormat _format = TournamentFormat.RoundRobin;
+    private int _halves = 1;
+    private int _minutes = 6;
+    private bool _overridden;
+    private FormatRecommendation? _recommendation;
+    private List<Match>? _generated;
+    private string? _error;
+
+    private bool CanCreate => !string.IsNullOrWhiteSpace(_name) && _selected.Count >= 2;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _teams = await db.Teams.OrderBy(t => t.Name).ToListAsync();
+        _tournaments = await db.Tournaments.OrderByDescending(t => t.CreatedAt).ToListAsync();
+    }
+
+    private void Toggle(int id)
+    {
+        if (!_selected.Remove(id)) _selected.Add(id);
+        if (_selected.Count >= 1)
+        {
+            _recommendation = TournamentSetup.Recommend(_selected.Count);
+            if (!_overridden) _format = _recommendation.Value.Format;
+        }
+        else _recommendation = null;
+    }
+
+    private static string FormatLabel(TournamentFormat f) => f switch
+    {
+        TournamentFormat.RoundRobin => "Liga (jeder gegen jeden)",
+        TournamentFormat.Groups => "Gruppen + K.o.",
+        _ => "K.o.-System",
+    };
+
+    private async Task Create()
+    {
+        if (!CanCreate) return;
+        try
+        {
+            var t = Setup.CreateTournament(_name, _format, _halves, _minutes * 60);
+            Setup.SetTeams(t.Id, _selected.ToList());
+            _generated = Setup.Generate(t.Id);
+            _error = null;
+            await Load();
+        }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private void ResetForm()
+    {
+        _generated = null; _selected.Clear(); _name = ""; _overridden = false; _recommendation = null;
+    }
+
+    private async Task Delete(Tournament t)
+    {
+        try { Setup.DeleteTournament(t.Id); _error = null; await Load(); }
+        catch (Exception e) { _error = e.Message; }
+    }
+}

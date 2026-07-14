@@ -1,0 +1,34 @@
+@page "/"
+@inject IDbContextFactory<AppDbContext> Dbf
+
+<PageTitle>Tischkicker – Dashboard</PageTitle>
+<h1>Dashboard</h1>
+
+<div class="card">
+    <h2 style="margin-top:0">Systemstatus</h2>
+    <p class="muted" style="margin:0">Datenbank: <strong style="color:#15803d">@(_dbOk ? "verbunden" : "Fehler")</strong> · Teams: @_teamCount · Turniere: @_tournamentCount</p>
+</div>
+
+<h2>Schnellzugriff</h2>
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:1rem">
+    <a class="card" href="teams" style="text-decoration:none; color:inherit"><strong style="color:var(--aw-blue)">Teams</strong><div class="muted">Anlegen &amp; bearbeiten</div></a>
+    <a class="card" href="setup" style="text-decoration:none; color:inherit"><strong style="color:var(--aw-blue)">Turnier-Setup</strong><div class="muted">Format &amp; Spielplan</div></a>
+    <a class="card" href="matches" style="text-decoration:none; color:inherit"><strong style="color:var(--aw-blue)">Spiele</strong><div class="muted">Live steuern</div></a>
+    <a class="card" href="rankings" style="text-decoration:none; color:inherit"><strong style="color:var(--aw-blue)">Rangliste</strong><div class="muted">Tabellen &amp; ELO</div></a>
+    <a class="card" href="settings" style="text-decoration:none; color:inherit"><strong style="color:var(--aw-blue)">Einstellungen</strong><div class="muted">MIRA (KI)</div></a>
+    <a class="card" href="live" target="_blank" style="text-decoration:none; background:var(--aw-blue); color:#fff"><strong>📺 Live-Anzeigetafel</strong><div style="opacity:0.8">Vollbild für TV/Beamer</div></a>
+</div>
+
+@code {
+    private bool _dbOk;
+    private int _teamCount;
+    private int _tournamentCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _teamCount = await db.Teams.CountAsync();
+        _tournamentCount = await db.Tournaments.CountAsync();
+        _dbOk = true;
+    }
+}

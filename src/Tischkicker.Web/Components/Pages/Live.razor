@@ -1,0 +1,235 @@
+@page "/live"
+@layout EmptyLayout
+@implements IDisposable
+@inject IDbContextFactory<AppDbContext> Dbf
+@inject TournamentSetup Setup
+@inject MiraService Mira
+@inject LiveNotifier Notifier
+
+<PageTitle>Tischkicker – Live</PageTitle>
+
+<div class="live-root">
+    <div class="ball animate-ball-roll">⚽</div>
+
+    @if (_goalSide is not null)
+    {
+        <div class="goal-banner animate-goal-banner" @key="_goalKey"><span>TOOR!</span></div>
+    }
+
+    <header class="live-header">
+        <img src="/assets/logos/A+W_invers_rgb.png" alt="A+W" />
+        <span style="font-size:1.1rem; font-weight:600; opacity:0.8">@(_currentTournament?.Name ?? "Tischkicker-Turnier") · Sommerfest 2026</span>
+    </header>
+
+    <main class="live-main">
+        <section class="live-center">
+            @if (_champion is not null)
+            {
+                <div class="ceremony animate-goal-banner">
+                    <div class="trophy animate-trophy">🏆</div>
+                    <div class="title">Turniersieger</div>
+                    <div class="winner">@Name(_champion.Value.WinnerId)</div>
+                    @if (_champion.Value.RunnerId is { } r) { <div class="runner">2. Platz: <strong style="color:rgba(255,255,255,0.8)">@Name(r)</strong></div> }
+                    <div style="margin-top:1.5rem; font-size:1.25rem; opacity:0.5">Herzlichen Glückwunsch! 🎉</div>
+                </div>
+            }
+            else if (_current is { } m)
+            {
+                var half = _currentTournament?.HalfDurationSec ?? 360;
+                var halves = _currentTournament?.Halves ?? 1;
+                var remaining = MatchClock.RemainingSeconds(new ClockState(m.ElapsedSec, m.TimerRunning, m.TimerStartedAtMs), half, MatchControl.NowMs());
+                <div style="font-size:1.5rem; opacity:0.7; margin-bottom:1rem">@(halves > 1 ? $"Halbzeit {m.CurrentHalf}/{halves}" : "Spiel läuft")</div>
+                <div class="scoreline">
+                    <div class="team">
+                        <div class="team-name">@Name(m.TeamAId)</div>
+                        <div class="team-score @(_goalSide == "a" ? "animate-goal-pop" : "")" @key="@("a" + _goalKey)">@m.ScoreA</div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:center">
+                        <div class="clock @(remaining <= 0 ? "over" : m.TimerRunning ? "running" : "paused")">@FormatClock(remaining)</div>
+                        <div style="margin-top:0.5rem; opacity:0.5">@(m.TimerRunning ? (remaining <= 0 ? "Zeit!" : "") : "Pause")</div>
+                    </div>
+                    <div class="team">
+                        <div class="team-name">@Name(m.TeamBId)</div>
+                        <div class="team-score @(_goalSide == "b" ? "animate-goal-pop" : "")" @key="@("b" + _goalKey)">@m.ScoreB</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div style="text-align:center">
+                    <div style="font-size:3rem; font-weight:700; opacity:0.8">Bereit für den Anpfiff</div>
+                    @if (_next is { } n) { <div style="font-size:1.75rem; opacity:0.6; margin-top:1rem">@Name(n.TeamAId) vs. @Name(n.TeamBId)</div> }
+                </div>
+            }
+        </section>
+
+        <aside class="live-side">
+            @{ var groups = _standings?.Groups.Where(g => g.Rows.Count > 0).ToList() ?? []; }
+            @if (groups.Count > 0)
+            {
+                <div class="side-title">Live-Tabelle</div>
+                @foreach (var g in groups)
+                {
+                    <div class="live-table">
+                        @if (g.GroupName is not null) { <h3>Gruppe @g.GroupName</h3> }
+                        <table>
+                            <thead><tr><th class="l">#</th><th class="l">Team</th><th>Sp</th><th>Diff</th><th>Pkt</th></tr></thead>
+                            <tbody>
+                            @{ var i = 1; }
+                            @foreach (var row in g.Rows)
+                            {
+                                <tr class="@(_currentIds.Contains(row.TeamId) ? "hl" : "")">
+                                    <td class="l" style="opacity:0.4">@(i++)</td>
+                                    <td class="l">@Name(row.TeamId)</td>
+                                    <td style="opacity:0.6">@row.Played</td>
+                                    <td style="opacity:0.6">@(row.GoalDiff > 0 ? "+" + row.GoalDiff : row.GoalDiff)</td>
+                                    <td style="font-weight:700">@row.Points</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+            else if (_upcoming.Count > 0)
+            {
+                <div class="side-title">Kommende Spiele</div>
+                <div class="live-table">
+                    @foreach (var u in _upcoming)
+                    {
+                        <div style="display:flex; justify-content:space-between; gap:0.5rem; padding:0.25rem 0">
+                            <span>@Name(u.TeamAId)</span><span style="opacity:0.4">vs.</span><span>@Name(u.TeamBId)</span>
+                        </div>
+                    }
+                </div>
+            }
+        </aside>
+    </main>
+
+    <footer class="live-footer">
+        <div style="font-size:1.25rem; opacity:0.8">
+            @if (_next is { } n2) { <span>Als Nächstes: <strong>@Name(n2.TeamAId) vs. @Name(n2.TeamBId)</strong></span> }
+            else { <span style="opacity:0.5">Kein weiteres Spiel geplant</span> }
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:1rem">
+            <div class="mira-bubble">@(_miraText.Length > 0 ? _miraText : "Willkommen beim A+W Tischkicker-Turnier! 🏆")</div>
+            <img class="mira-img" src="@(_current is not null ? "/assets/mira/Mira_unterwegs.png" : "/assets/mira/Mira_standing.png")" alt="MIRA" />
+        </div>
+    </footer>
+</div>
+
+@code {
+    private List<Match> _matches = [];
+    private Dictionary<int, string> _names = new();
+    private List<Tournament> _tournaments = [];
+    private StandingsResponse? _standings;
+    private Match? _current, _next;
+    private Tournament? _currentTournament;
+    private HashSet<int> _currentIds = [];
+    private List<Match> _upcoming = [];
+    private (int WinnerId, int? RunnerId)? _champion;
+
+    private string _miraText = "";
+    private Match? _prevForMira;
+    private (int Id, int A, int B)? _prevScore;
+    private string? _goalSide;
+    private int _goalKey;
+
+    private System.Threading.Timer? _clock;
+    private System.Threading.Timer? _goalClear;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Notifier.Changed += OnChanged;
+        await Reload();
+        _clock = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 250, 250);
+    }
+
+    private void OnChanged() => _ = InvokeAsync(async () => { await Reload(); StateHasChanged(); });
+
+    private async Task Reload()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _matches = await db.Matches.ToListAsync();
+        _tournaments = await db.Tournaments.OrderByDescending(t => t.CreatedAt).ToListAsync();
+        _names = await db.Teams.ToDictionaryAsync(t => t.Id, t => t.Name);
+
+        _current = _matches.FirstOrDefault(m => m.Status == MatchStatus.Live);
+        _next = _matches.Where(m => m.Status == MatchStatus.Scheduled)
+            .OrderBy(m => m.Round ?? 0).ThenBy(m => m.Id)
+            .FirstOrDefault(m => m.TeamAId is not null && m.TeamBId is not null)
+            ?? _matches.Where(m => m.Status == MatchStatus.Scheduled).OrderBy(m => m.Round ?? 0).ThenBy(m => m.Id).FirstOrDefault();
+
+        var activeTid = _current?.TournamentId ?? _next?.TournamentId
+            ?? _tournaments.FirstOrDefault(t => _matches.Any(m => m.TournamentId == t.Id))?.Id;
+        _currentTournament = _tournaments.FirstOrDefault(t => t.Id == activeTid);
+        _standings = activeTid is { } tid ? Setup.GetStandings(tid) : null;
+
+        _currentIds = new HashSet<int>(new[] { _current?.TeamAId, _current?.TeamBId }.Where(x => x is not null).Select(x => x!.Value));
+        _upcoming = _matches.Where(m => m.Status == MatchStatus.Scheduled && m.Id != _current?.Id).Take(8).ToList();
+
+        _champion = ComputeChampion(activeTid);
+
+        // MIRA-Kommentar bei Spielübergängen.
+        var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name);
+        _prevForMira = _current;
+        if (ctx is not null) _miraText = Mira.Comment(ctx);
+
+        DetectGoal(_current);
+    }
+
+    private (int, int?)? ComputeChampion(int? activeTid)
+    {
+        if (activeTid is null || _current is not null) return null;
+        var tm = _matches.Where(m => m.TournamentId == activeTid).ToList();
+        if (tm.Count == 0 || tm.Any(m => m.Status != MatchStatus.Finished)) return null;
+
+        var bracket = tm.Where(m => m.GroupName is null && m.Round is not null).ToList();
+        if (bracket.Count > 0)
+        {
+            var final = bracket.OrderByDescending(m => m.Round).First();
+            if (final.TeamAId is null || final.TeamBId is null || final.ScoreA == final.ScoreB) return null;
+            var aWins = final.ScoreA > final.ScoreB;
+            return (aWins ? final.TeamAId!.Value : final.TeamBId!.Value, aWins ? final.TeamBId : final.TeamAId);
+        }
+        if (_currentTournament?.Format == TournamentFormat.RoundRobin)
+        {
+            var rows = _standings?.Groups.FirstOrDefault()?.Rows ?? [];
+            if (rows.Count >= 3) return (rows[0].TeamId, rows.Count > 1 ? rows[1].TeamId : null);
+        }
+        return null;
+    }
+
+    private void DetectGoal(Match? current)
+    {
+        if (current is null) { _prevScore = null; return; }
+        if (_prevScore is { } p && p.Id == current.Id)
+        {
+            if (current.ScoreA > p.A) TriggerGoal("a");
+            else if (current.ScoreB > p.B) TriggerGoal("b");
+        }
+        _prevScore = (current.Id, current.ScoreA, current.ScoreB);
+    }
+
+    private void TriggerGoal(string side)
+    {
+        _goalSide = side; _goalKey++;
+        _goalClear?.Dispose();
+        _goalClear = new System.Threading.Timer(_ => InvokeAsync(() => { _goalSide = null; StateHasChanged(); }), null, 1800, System.Threading.Timeout.Infinite);
+    }
+
+    private string Name(int? id) => id is { } i && _names.TryGetValue(i, out var n) ? n : "—";
+
+    private static string FormatClock(double totalSec)
+    {
+        var s = Math.Max(0, (int)Math.Ceiling(totalSec));
+        return $"{s / 60:00}:{s % 60:00}";
+    }
+
+    public void Dispose()
+    {
+        Notifier.Changed -= OnChanged;
+        _clock?.Dispose();
+        _goalClear?.Dispose();
+    }
+}

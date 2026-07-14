@@ -1,0 +1,215 @@
+@page "/matches"
+@implements IDisposable
+@inject IDbContextFactory<AppDbContext> Dbf
+@inject MatchControl Control
+@inject IJSRuntime JS
+
+<PageTitle>Spiele</PageTitle>
+
+@if (_error is not null) { <div class="err">⚠️ @_error</div> }
+
+@if (_selected is null)
+{
+    <h1>Spiele</h1>
+    <div class="card">
+        <h2 style="margin-top:0; font-size:1rem">Neues Freundschaftsspiel</h2>
+        @if (_teams.Count < 2) { <p class="muted">Mindestens zwei Teams nötig.</p> }
+        else
+        {
+            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+                <select @bind="_fa"><option value="0">Team A …</option>@foreach (var t in _teams.Where(t => t.Id != _fb)) { <option value="@t.Id">@t.Name</option> }</select>
+                <span class="muted">vs.</span>
+                <select @bind="_fb"><option value="0">Team B …</option>@foreach (var t in _teams.Where(t => t.Id != _fa)) { <option value="@t.Id">@t.Name</option> }</select>
+                <button class="btn-aw" disabled="@(_fa == 0 || _fb == 0 || _fa == _fb)" @onclick="CreateFriendly">Anpfiff vorbereiten</button>
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <table class="data">
+            <tbody>
+            @foreach (var m in _matches)
+            {
+                <tr>
+                    <td><span class="badge @StatusClass(m.Status)">@StatusLabel(m.Status)</span></td>
+                    <td><strong>@Name(m.TeamAId)</strong> <span class="muted">@m.ScoreA : @m.ScoreB</span> <strong>@Name(m.TeamBId)</strong></td>
+                    <td style="text-align:right; white-space:nowrap">
+                        <button class="btn-aw" @onclick="() => Open(m)">@(m.Status == MatchStatus.Finished ? "Ansehen" : "Steuern")</button>
+                        <button class="btn-link-danger" @onclick="() => Delete(m)">Löschen</button>
+                    </td>
+                </tr>
+            }
+            @if (_matches.Count == 0) { <tr><td class="muted">Noch keine Spiele.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    var m = _selected;
+    var half = _tournament?.HalfDurationSec ?? 360;
+    var halves = _tournament?.Halves ?? 1;
+    var finished = m.Status == MatchStatus.Finished;
+    var remaining = MatchClock.RemainingSeconds(new ClockState(m.ElapsedSec, m.TimerRunning, m.TimerStartedAtMs), half, MatchControl.NowMs());
+    var expired = remaining <= 0;
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+        <button class="btn-ghost" @onclick="Back">← Übersicht</button>
+        <span class="muted">@(_tournament?.Name ?? "Spiel") · HZ @m.CurrentHalf/@halves</span>
+    </div>
+
+    <div style="background:var(--aw-blue); color:#fff; border-radius:1rem; padding:2rem">
+        <div style="text-align:center; margin-bottom:1.5rem">
+            <div style="font-family:ui-monospace,monospace; font-size:4rem; font-weight:700; color:@(expired ? "#fca5a5" : "var(--aw-accent)")">@FormatClock(remaining)</div>
+            <div style="opacity:0.7; font-size:0.9rem">@(finished ? "Spiel beendet" : m.TimerRunning ? (expired ? "Zeit abgelaufen" : "läuft …") : "pausiert")</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem">
+            @TeamPanel(Name(m.TeamAId), m.ScoreA, "a", finished)
+            @TeamPanel(Name(m.TeamBId), m.ScoreB, "b", finished)
+        </div>
+
+        @if (!finished && m.Status == MatchStatus.Live)
+        {
+            <div style="display:flex; gap:0.5rem; justify-content:center; align-items:center; margin-top:1.5rem">
+                <span style="opacity:0.7; margin-right:0.25rem">Uhr:</span>
+                <button class="btn-ghost" style="color:#fff; border-color:rgba(255,255,255,0.4)" @onclick="() => Act(() => Control.AdjustClock(m.Id, -60, MatchControl.NowMs()))">−1:00</button>
+                <button class="btn-ghost" style="color:#fff; border-color:rgba(255,255,255,0.4)" @onclick="() => Act(() => Control.AdjustClock(m.Id, -10, MatchControl.NowMs()))">−0:10</button>
+                <button class="btn-ghost" style="color:#fff; border-color:rgba(255,255,255,0.4)" @onclick="() => Act(() => Control.AdjustClock(m.Id, 10, MatchControl.NowMs()))">+0:10</button>
+                <button class="btn-ghost" style="color:#fff; border-color:rgba(255,255,255,0.4)" @onclick="() => Act(() => Control.AdjustClock(m.Id, 60, MatchControl.NowMs()))">+1:00</button>
+            </div>
+        }
+    </div>
+
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1.5rem">
+        @if (!finished && m.Status == MatchStatus.Scheduled) { <button class="btn-aw" @onclick="() => Act(() => Control.Start(m.Id, MatchControl.NowMs()))">▶ Start</button> }
+        @if (!finished && m.Status == MatchStatus.Live && m.TimerRunning) { <button class="btn-aw" @onclick="() => Act(() => Control.Pause(m.Id, MatchControl.NowMs()))">⏸ Pause</button> }
+        @if (!finished && m.Status == MatchStatus.Live && !m.TimerRunning) { <button class="btn-aw" @onclick="() => Act(() => Control.Resume(m.Id, MatchControl.NowMs()))">▶ Fortsetzen</button> }
+        @if (!finished && halves > 1 && m.CurrentHalf < halves) { <button class="btn-aw" @onclick="() => Act(() => Control.NextHalf(m.Id, MatchControl.NowMs()))">⇄ Nächste Halbzeit</button> }
+        @if (!finished) { <button class="btn-danger" @onclick="() => Act(() => Control.Finish(m.Id, MatchControl.NowMs()))">⏹ Spiel beenden</button> }
+        @if (finished)
+        {
+            <div class="card" style="margin:0">Endstand: @Name(m.TeamAId) @m.ScoreA : @m.ScoreB @Name(m.TeamBId)</div>
+            <button class="btn-ghost" @onclick="() => _correcting = !_correcting">@(_correcting ? "✓ Korrektur fertig" : "✎ Ergebnis korrigieren")</button>
+        }
+    </div>
+    @if (finished && _correcting) { <p class="muted" style="margin-top:0.75rem">Passe den Endstand über die +/-‑Buttons an. Tabelle und ELO werden neu berechnet.</p> }
+}
+
+@code {
+    private List<Team> _teams = [];
+    private List<Match> _matches = [];
+    private Dictionary<int, string> _names = new();
+    private Match? _selected;
+    private Tournament? _tournament;
+    private string? _error;
+    private bool _correcting;
+    private int _fa, _fb;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync() => await LoadLists();
+
+    private async Task LoadLists()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _teams = await db.Teams.OrderBy(t => t.Name).ToListAsync();
+        _matches = await db.Matches.OrderBy(m => m.Id).ToListAsync();
+        _names = _teams.ToDictionary(t => t.Id, t => t.Name);
+    }
+
+    private string Name(int? id) => id is { } i && _names.TryGetValue(i, out var n) ? n : "—";
+
+    private async Task Open(Match m)
+    {
+        _selected = m; _correcting = false; _error = null;
+        await using var db = await Dbf.CreateDbContextAsync();
+        _tournament = await db.Tournaments.FindAsync(m.TournamentId);
+        EnsureTicker();
+    }
+
+    private async Task Back()
+    {
+        _selected = null; _tournament = null; EnsureTicker();
+        await LoadLists();
+    }
+
+    private void Act(Func<Match> fn)
+    {
+        try { _selected = fn(); _error = null; EnsureTicker(); }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private Task ChangeScore(string team, int delta)
+    {
+        var m = _selected!;
+        if (m.Status == MatchStatus.Finished)
+        {
+            var a = team == "a" ? Math.Max(0, m.ScoreA + delta) : m.ScoreA;
+            var b = team == "b" ? Math.Max(0, m.ScoreB + delta) : m.ScoreB;
+            Act(() => Control.CorrectResult(m.Id, a, b));
+        }
+        else Act(() => Control.AdjustScore(m.Id, team, delta));
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateFriendly()
+    {
+        try { var m = Control.CreateFriendly(_fa, _fb); await LoadLists(); await Open(m); _fa = _fb = 0; }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private async Task Delete(Match m)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Spiel löschen?")) return;
+        await using var db = await Dbf.CreateDbContextAsync();
+        var e = await db.Matches.FindAsync(m.Id);
+        if (e is not null) { db.Matches.Remove(e); await db.SaveChangesAsync(); }
+        await LoadLists();
+    }
+
+    private void EnsureTicker()
+    {
+        var live = _selected is { Status: MatchStatus.Live, TimerRunning: true };
+        if (live && _timer is null)
+            _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 250, 250);
+        else if (!live && _timer is not null) { _timer.Dispose(); _timer = null; }
+    }
+
+    private static string FormatClock(double totalSec)
+    {
+        var s = Math.Max(0, (int)Math.Ceiling(totalSec));
+        return $"{s / 60:00}:{s % 60:00}";
+    }
+
+    private static string StatusLabel(MatchStatus s) => s switch
+    { MatchStatus.Live => "Live", MatchStatus.Finished => "Beendet", _ => "Geplant" };
+    private static string StatusClass(MatchStatus s) => s switch
+    { MatchStatus.Live => "badge-live", MatchStatus.Finished => "badge-done", _ => "badge-sched" };
+
+    private RenderFragment TeamPanel(string name, int score, string team, bool finished) => builder =>
+    {
+        var disabled = finished && !_correcting;
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "style", "display:flex; flex-direction:column; align-items:center; gap:0.75rem");
+        builder.AddMarkupContent(2, $"<div style='font-size:1.25rem; font-weight:600'>{System.Net.WebUtility.HtmlEncode(name)}</div>");
+        builder.AddMarkupContent(3, $"<div style='font-size:4rem; font-weight:900; font-variant-numeric:tabular-nums'>{score}</div>");
+        builder.OpenElement(4, "div");
+        builder.AddAttribute(5, "style", "display:flex; gap:0.5rem");
+        builder.OpenElement(6, "button");
+        builder.AddAttribute(7, "class", "btn-aw");
+        builder.AddAttribute(8, "disabled", disabled);
+        builder.AddAttribute(9, "onclick", EventCallback.Factory.Create(this, () => ChangeScore(team, 1)));
+        builder.AddContent(10, "+1");
+        builder.CloseElement();
+        builder.OpenElement(11, "button");
+        builder.AddAttribute(12, "class", "btn-ghost");
+        builder.AddAttribute(13, "style", "color:#fff; border-color:rgba(255,255,255,0.4)");
+        builder.AddAttribute(14, "disabled", disabled);
+        builder.AddAttribute(15, "onclick", EventCallback.Factory.Create(this, () => ChangeScore(team, -1)));
+        builder.AddContent(16, "−1");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

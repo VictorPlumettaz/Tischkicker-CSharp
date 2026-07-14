@@ -1,0 +1,120 @@
+@page "/teams"
+@inject IDbContextFactory<AppDbContext> Dbf
+@inject IJSRuntime JS
+
+<PageTitle>Teams</PageTitle>
+<h1>Teams</h1>
+
+@if (_error is not null) { <div class="err">⚠️ @_error</div> }
+
+<div class="card">
+    <h2 style="margin-top:0; font-size:1rem">Neues Team</h2>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center">
+        <input @bind="_name" placeholder="Teamname" />
+        <input @bind="_players" placeholder="Spieler (optional)" />
+        <button class="btn-aw" disabled="@(string.IsNullOrWhiteSpace(_name))" @onclick="Add">Anlegen</button>
+    </div>
+</div>
+
+<div class="card">
+    <table class="data">
+        <thead><tr><th>Team</th><th>Spieler</th><th style="text-align:right">ELO</th><th style="text-align:right">S/U/N</th><th style="text-align:right">Tore</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var t in _teams)
+        {
+            <tr>
+                @if (_editId == t.Id)
+                {
+                    <td><input @bind="_editName" /></td>
+                    <td><input @bind="_editPlayers" /></td>
+                    <td colspan="3" class="muted" style="text-align:right">Bearbeiten…</td>
+                    <td style="text-align:right">
+                        <button class="btn-aw" @onclick="SaveEdit">Speichern</button>
+                        <button class="btn-ghost" @onclick="() => _editId = null">Abbrechen</button>
+                    </td>
+                }
+                else
+                {
+                    <td><strong>@t.Name</strong></td>
+                    <td class="muted">@(t.Players ?? "—")</td>
+                    <td style="text-align:right; font-variant-numeric:tabular-nums">@t.Elo</td>
+                    <td style="text-align:right">@t.Wins/@t.Draws/@t.Losses</td>
+                    <td style="text-align:right">@t.GoalsFor : @t.GoalsAgainst</td>
+                    <td style="text-align:right; white-space:nowrap">
+                        <button class="btn-ghost" @onclick="() => StartEdit(t)">Bearbeiten</button>
+                        <button class="btn-link-danger" @onclick="() => Delete(t)">Löschen</button>
+                    </td>
+                }
+            </tr>
+        }
+        @if (_teams.Count == 0) { <tr><td colspan="6" class="muted">Noch keine Teams angelegt.</td></tr> }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Team> _teams = [];
+    private string? _error;
+    private string _name = "";
+    private string _players = "";
+    private int? _editId;
+    private string _editName = "";
+    private string _editPlayers = "";
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        await using var db = await Dbf.CreateDbContextAsync();
+        _teams = await db.Teams.OrderBy(t => t.Name).ToListAsync();
+    }
+
+    private async Task Add()
+    {
+        var name = _name.Trim();
+        if (name.Length == 0) return;
+        try
+        {
+            await using var db = await Dbf.CreateDbContextAsync();
+            db.Teams.Add(new Team { Name = name, Players = string.IsNullOrWhiteSpace(_players) ? null : _players.Trim() });
+            await db.SaveChangesAsync();
+            _name = ""; _players = ""; _error = null;
+            await Load();
+        }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private void StartEdit(Team t) { _editId = t.Id; _editName = t.Name; _editPlayers = t.Players ?? ""; }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await using var db = await Dbf.CreateDbContextAsync();
+            var t = await db.Teams.FindAsync(_editId);
+            if (t is not null)
+            {
+                t.Name = _editName.Trim();
+                t.Players = string.IsNullOrWhiteSpace(_editPlayers) ? null : _editPlayers.Trim();
+                t.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
+            _editId = null;
+            await Load();
+        }
+        catch (Exception e) { _error = e.Message; }
+    }
+
+    private async Task Delete(Team t)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Team \"{t.Name}\" löschen?")) return;
+        try
+        {
+            await using var db = await Dbf.CreateDbContextAsync();
+            var e = await db.Teams.FindAsync(t.Id);
+            if (e is not null) { db.Teams.Remove(e); await db.SaveChangesAsync(); }
+            await Load();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}
