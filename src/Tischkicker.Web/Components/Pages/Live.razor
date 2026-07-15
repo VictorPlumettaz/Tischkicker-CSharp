@@ -167,12 +167,16 @@
     private int _behindMatchId;
     private bool _aWasBehind, _bWasBehind;
 
+    // Merkt, für welches Turnier der K.o.-Start bereits angesagt wurde (einmalig pro Turnier).
+    private int _koAnnouncedTid;
+
     // Zeit-Trigger-Zustand (pro laufendem Spiel).
     // Abstand periodischer Zwischenkommentare – aus den MIRA-Settings, bei jedem Reload aufgefrischt.
     private long _interludeIntervalMs = SettingsService.DefaultInterludeSec * 1000L;
     private int _timeMatchId;
     private int _finalMinuteHalf;
     private bool _goldenGoalAnnounced;
+    private bool _timeUpAnnounced;
     private long _lastInterludeMs;
 
     private System.Threading.Timer? _clock;
@@ -237,6 +241,8 @@
 
         // MIRA-Kommentar bei Spielübergängen (Tor, Anpfiff, Halbzeit, Ende …).
         var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name, _aWasBehind, _bWasBehind);
+        // Gerade automatisch erzeugte K.o.-Phase hat Vorrang vor der normalen Ankündigung.
+        if (_current is null && DetectKnockoutStart() is { } koCtx) ctx = koCtx;
         _prevForMira = _current;
 
         // Rückstands-Historie mit dem aktuellen Stand fortschreiben (nach dem Ableiten).
@@ -315,6 +321,7 @@
             _timeMatchId = m.Id;
             _finalMinuteHalf = 0;
             _goldenGoalAnnounced = false;
+            _timeUpAnnounced = false;
             _lastInterludeMs = MatchControl.NowMs();
         }
 
@@ -330,6 +337,15 @@
         {
             _goldenGoalAnnounced = true;
             return new MiraContext { Mood = MiraMood.GoldenGoal, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB };
+        }
+
+        // Reguläre Spielzeit der letzten Halbzeit abgelaufen → kurze Zusammenfassung (einmalig).
+        // Beim K.o.-Gleichstand übernimmt stattdessen der Golden Goal (Spiel läuft weiter).
+        var halves = _currentTournament?.Halves ?? 1;
+        if (remaining <= 0 && !(isKo && tied) && !_timeUpAnnounced && m.CurrentHalf >= halves)
+        {
+            _timeUpAnnounced = true;
+            return new MiraContext { Mood = MiraMood.TimeUp, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB };
         }
 
         // Schlussphase: letzte Minute – einmal je Halbzeit.
@@ -370,6 +386,27 @@
         // Nach JEDEM Kommentar (Tor, Anpfiff, Schlussphase …) die Interlude-Uhr neu starten,
         // damit direkt nach einem Ereignis kein Zwischenkommentar hinterherfeuert.
         finally { _miraBusy = false; _lastInterludeMs = MatchControl.NowMs(); }
+    }
+
+    /// <summary>
+    /// Erkennt einmalig, dass die K.o.-Phase eines Gruppen-Turniers gerade frisch entstanden ist
+    /// (alle Gruppenspiele beendet, Baum vorhanden, noch kein K.o.-Spiel gestartet) – für die
+    /// MIRA-Ansage des Übergangs Gruppenphase → K.o.
+    /// </summary>
+    private MiraContext? DetectKnockoutStart()
+    {
+        if (_activeTid is not { } tid || _currentTournament?.Format != TournamentFormat.Groups) return null;
+        if (_koAnnouncedTid == tid) return null;
+
+        var tm = _matches.Where(m => m.TournamentId == tid).ToList();
+        var group = tm.Where(m => m.GroupName is not null).ToList();
+        var ko = tm.Where(m => m.GroupName is null).ToList();
+        if (group.Count == 0 || ko.Count == 0) return null;                // noch kein K.o.-Baum
+        if (group.Any(m => m.Status != MatchStatus.Finished)) return null;  // Gruppen noch nicht fertig
+        if (ko.Any(m => m.Status != MatchStatus.Scheduled)) return null;    // K.o. läuft bereits → nicht (neu) ansagen
+
+        _koAnnouncedTid = tid;
+        return new MiraContext { Mood = MiraMood.KnockoutStart };
     }
 
     /// <summary>Kompakter Turnier-/Tabellenkontext für MIRA Stufe B (Stand, letzte Ergebnisse, offene Spiele).</summary>
@@ -427,6 +464,22 @@
             else
             {
                 sb.AppendLine($"Direkte Duelle {Name(fa)} vs. {Name(fb)}: noch nie gegeneinander gespielt – Premiere!");
+            }
+        }
+
+        // K.o.-Baum (falls vorhanden): Runden + Paarungen, damit MIRA Wege und mögliche
+        // Finalpaarungen beschreiben kann. „(noch offen)" = Sieger steht noch nicht fest.
+        var bracket = tm.Where(m => m.GroupName is null && m.Round is not null)
+            .OrderBy(m => m.Round).ThenBy(m => m.Id).ToList();
+        if (bracket.Count > 0)
+        {
+            string SlotName(int? id) => id is null ? "(noch offen)" : Name(id);
+            sb.AppendLine("K.o.-Baum:");
+            foreach (var rg in bracket.GroupBy(m => m.Round!.Value).OrderBy(g => g.Key))
+            {
+                sb.AppendLine($"  {RoundLabel(rg.Key, bracket)}:");
+                foreach (var km in rg.OrderBy(m => m.Id))
+                    sb.AppendLine($"    {SlotName(km.TeamAId)} vs. {SlotName(km.TeamBId)}");
             }
         }
 

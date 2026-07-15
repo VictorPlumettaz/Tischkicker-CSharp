@@ -13,7 +13,7 @@ public sealed class MatchControlException(string message) : Exception(message);
 /// Beenden (inkl. ELO-/Bilanz-Verbuchung) sowie nachträgliche Ergebnis-Korrektur
 /// (mit vollständigem Neu-Einspielen). Portiert aus services/matchControl.ts.
 /// </summary>
-public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifier notifier)
+public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifier notifier, TournamentSetup setup)
 {
     private const string FriendlyName = "Freundschaftsspiele";
 
@@ -136,7 +136,34 @@ public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifi
                 if (slot == "a") nextM.TeamAId = winnerId; else nextM.TeamBId = winnerId;
             }
         }
-        return Commit(db, m);
+        db.SaveChanges();
+
+        // War das das letzte offene Gruppenspiel? Dann die K.o.-Phase automatisch erzeugen.
+        TryGenerateKnockout(db, m);
+
+        notifier.NotifyChanged();
+        return m;
+    }
+
+    /// <summary>
+    /// Erzeugt die K.o.-Phase automatisch, sobald mit diesem Spiel die letzte offene
+    /// Gruppenpartie beendet wurde (Gruppen-Turnier, Baum noch nicht vorhanden).
+    /// Fehler werden geschluckt, damit das Beenden des Spiels nie scheitert.
+    /// </summary>
+    private void TryGenerateKnockout(AppDbContext db, Match finished)
+    {
+        if (finished.GroupName is null) return; // kein Gruppenspiel → nichts zu tun
+
+        var t = db.Tournaments.Find(finished.TournamentId);
+        if (t is null || t.Format != TournamentFormat.Groups) return;
+
+        var all = db.Matches.Where(m => m.TournamentId == finished.TournamentId).ToList();
+        var group = all.Where(m => m.GroupName != null).ToList();
+        if (group.Count == 0 || group.Any(m => m.Status != MatchStatus.Finished)) return; // noch nicht fertig
+        if (all.Any(m => m.GroupName == null)) return; // K.o.-Phase existiert bereits
+
+        try { setup.GenerateKnockoutPhase(finished.TournamentId); }
+        catch (Exception e) { Console.WriteLine($"[matchcontrol] Auto-K.o.-Phase fehlgeschlagen: {e.Message}"); }
     }
 
     /// <summary>

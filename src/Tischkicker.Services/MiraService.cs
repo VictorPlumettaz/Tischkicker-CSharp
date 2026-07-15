@@ -127,8 +127,10 @@ public class MiraService(SettingsService settings)
             MiraMood.Halftime => $"Halbzeit im Spiel {a} gegen {b} – die Teams machen kurz Pause.{score}",
             MiraMood.Win => $"Abpfiff! {scorer} gewinnt das Spiel {a} gegen {b}.{endScore} Fasse kurz zusammen, wie das Spiel ausging, und gib einen Ausblick: Was bedeutet das Ergebnis für die Tabelle bzw. den weiteren Turnierverlauf? (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
             MiraMood.Draw => $"Das Spiel {a} gegen {b} endet unentschieden.{endScore} Fasse kurz zusammen und gib einen Ausblick, was das Remis für beide in der Tabelle bzw. im Turnier bedeutet. (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
+            MiraMood.TimeUp => $"Die reguläre Spielzeit im Spiel {a} gegen {b} ist gerade abgelaufen.{score} Fasse in EINEM kurzen Satz zusammen, wie das Spiel ausging (Sieger oder Remis).",
             MiraMood.FinalMinute => $"Die Schlussphase im Spiel {a} gegen {b} läuft – nur noch{ClockText(ctx)} zu spielen.{score} Heize die Spannung an.",
             MiraMood.GoldenGoal => $"Golden Goal! Das K.o.-Spiel {a} gegen {b} steht nach Ablauf der regulären Zeit unentschieden{score} – jetzt entscheidet das nächste Tor.",
+            MiraMood.KnockoutStart => "Die Gruppenphase ist beendet – jetzt beginnt die K.o.-Phase! Verkünde das mitreißend, nenne die ersten K.o.-Paarungen aus dem Kontext und spekuliere augenzwinkernd, wer sich vielleicht bis ins Finale durchsetzen oder wer dort aufeinandertreffen könnte. (Hier ausnahmsweise 2-3 Sätze erlaubt; klar als Möglichkeit formulieren, nichts als sicher behaupten.)",
             MiraMood.Interlude => $"Gib einen kurzen Zwischenkommentar zum laufenden Spiel {a} gegen {b}.{score} Nimm dabei Bezug auf den Turnierverlauf, die Tabelle oder die Chancen der Teams.",
             _ => $"Kommentiere die aktuelle Situation im Spiel {a} gegen {b}.{score}",
         };

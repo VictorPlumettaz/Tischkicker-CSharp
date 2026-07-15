@@ -107,11 +107,23 @@ public static class MiraPhrases
             "Letzte Minute! Wer will den Sieg mehr? 🔥",
             "Gleich ist Schluss – noch ist alles drin! ⚽",
         ],
+        [MiraMood.TimeUp] =
+        [
+            "Zeit abgelaufen! Es steht {sa}:{sb} – das war ein Spiel! ⏱️",
+            "Die reguläre Zeit ist um, Endstand {sa}:{sb}. 🔚",
+            "Schluss mit der Spielzeit – {sa}:{sb} auf der Anzeige! ⏱️",
+        ],
         [MiraMood.GoldenGoal] =
         [
             "Golden Goal! Das nächste Tor entscheidet – Nervenkitzel pur! ⚡",
             "Gleichstand nach der Zeit – jetzt zählt jeder Schuss! 🥅",
             "Sudden Death! Wer trifft, gewinnt! 🔥",
+        ],
+        [MiraMood.KnockoutStart] =
+        [
+            "Die Gruppenphase ist Geschichte – jetzt beginnt die K.o.-Phase! 🏆",
+            "Gruppen abgehakt, ab jetzt zählt's: Wer rausfliegt, ist raus! ⚔️",
+            "Und weiter geht's mit der K.o.-Runde – jetzt wird's ernst! 🔥",
         ],
         [MiraMood.Interlude] =
         [

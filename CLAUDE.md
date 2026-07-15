@@ -89,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (42 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (43 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -120,5 +120,12 @@ Team erreichen kann), Abpfiff liefert **Zusammenfassung + Ausblick** (Endstand i
 Kontext, Tabellen-/Turnierfolgen), A+W-Software-Witze deutlich reduziert, und der
 `Comeback`-Mood („Spiel gedreht") feuert korrekt, indem `Live.razor` die
 Rückstands-Historie je Team verfolgt (`Derive`-Flags `scorerAWasBehind/BWasBehind`).
-42 Tests grün.
+Neuer Mood **`TimeUp`**: läuft die reguläre Zeit der letzten Halbzeit ab, liefert
+MIRA eine **kurze Spielzusammenfassung** (Ticker-Trigger in `Live.razor`, außer
+beim Golden Goal). **Auto-K.o.-Phase:** `MatchControl.Finish` erzeugt bei
+Gruppen-Turnieren automatisch die K.o.-Phase, sobald das letzte Gruppenspiel
+beendet ist (`TryGenerateKnockout`; manueller Button auf `/rankings` bleibt als
+Fallback). MIRA sagt den Übergang an (neuer Mood **`KnockoutStart`**), inkl.
+K.o.-Baum in `BuildSituation` (Runden/Paarungen, mögliche Finalpaarungen).
+43 Tests grün.
 Details/History: `PLAN.md`.

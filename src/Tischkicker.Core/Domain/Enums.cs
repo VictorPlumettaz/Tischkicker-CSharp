@@ -48,6 +48,10 @@ public enum MiraMood
     FinalMinute,
     /// <summary>K.o.-Spiel: reguläre Zeit abgelaufen, aber Gleichstand (Golden Goal).</summary>
     GoldenGoal,
+    /// <summary>Reguläre Spielzeit der letzten Halbzeit abgelaufen – kurze Spielzusammenfassung.</summary>
+    TimeUp,
     /// <summary>Periodischer Zwischenkommentar ohne konkretes Ereignis (mit Turnier-/Tabellenbezug).</summary>
     Interlude,
+    /// <summary>Gruppenphase beendet, K.o.-Phase beginnt – Baum/Paarungen ansagen.</summary>
+    KnockoutStart,
 }

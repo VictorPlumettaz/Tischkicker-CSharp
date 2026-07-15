@@ -98,16 +98,29 @@ Anthropic C#-SDK mit automatischem Fallback; DB unter `%LOCALAPPDATA%\Tischkicke
   beim Führungstor aus dem Gleichstand, wenn der Schütze zuvor zurücklag –
   `MiraNarrator.Derive` erhält Flags `scorerAWasBehind/scorerBWasBehind`,
   `Live.razor` pflegt die Rückstands-Historie je laufendem Spiel.
+- ✅ **Zeit abgelaufen → kurze Zusammenfassung**: neuer Mood `TimeUp`, den
+  `DetectTimeContext` einmalig auslöst, sobald die reguläre Zeit der letzten
+  Halbzeit auf 0 steht (nicht beim K.o.-Gleichstand – dort greift der Golden Goal).
+  Stufe A liefert Endstand-Spruch, Stufe B einen kurzen Ein-Satz-Abschluss.
+- ✅ **Auto-K.o.-Phase + Übergangs-Ansage**: `MatchControl.Finish` erzeugt bei
+  Gruppen-Turnieren die K.o.-Phase automatisch, sobald das letzte offene
+  Gruppenspiel beendet ist (`TryGenerateKnockout`, Fehler werden geschluckt;
+  `MatchControl` erhält dafür `TournamentSetup` per DI). Der manuelle Button auf
+  `/rankings` bleibt als Fallback. MIRA erkennt den Übergang (neuer Mood
+  `KnockoutStart`, einmalig via `DetectKnockoutStart` in `Live.razor`) und sagt
+  Beginn + erste Paarungen + mögliche Finalpaarungen an; `BuildSituation` liefert
+  dafür den **K.o.-Baum** (Runden, Paarungen, „(noch offen)" für offene Slots).
 
 ## Verifikation
 
-- `dotnet build` + `dotnet test` grün (**42 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
+- `dotnet build` + `dotnet test` grün (**43 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
   `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, K.o.-Reset erhält Freilos-Teams,
   Golden-Goal-Sperre (K.o.-Remis wirft, Liga-Remis erlaubt), `UpdateTournament`,
   `SettingsService` (inkl. `interludeSec`-Persistenz + Bereichsprüfung),
   `includeLive` (laufendes Spiel zählt mit / geplante nicht),
   `MiraNarrator`-Mood-Klassifikation (CloseGap/Equalizer/Lead/Extend/Comeback nach
-  Rückstand, Endstand bei Abpfiff)).
+  Rückstand, Endstand bei Abpfiff), Auto-K.o.-Phase nach letztem Gruppenspiel
+  (erzeugt Baum + blockiert erneuten Aufruf; nicht bei offenen Gruppenspielen)).
 - End-to-End geprüft: Boot/Migration, alle Routen 200, `--seed`, Live-Tafel,
   Ruhe-Ansicht mit Spielplan, publizierte `.exe` inkl. Static Assets. Zuletzt
   bestätigt: Live-Tabelle zählt ein laufendes Gruppenspiel provisorisch mit.
