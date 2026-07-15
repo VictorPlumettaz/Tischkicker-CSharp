@@ -52,11 +52,20 @@ Anthropic C#-SDK mit automatischem Fallback; DB unter `%LOCALAPPDATA%\Tischkicke
   Seitenspalte weiter die Live-Tabelle.
 - ✅ **Verteilung**: kompletter `publish/`-Ordner als `Tischkicker.zip`
   (die `.exe` allein läuft nicht – braucht Static-Assets-Manifest + `wwwroot/`).
+- ✅ **Golden-Goal-Sperre**: K.o.-Spiele (K.o.-Turnier bzw. K.o.-Phase eines
+  Gruppen-Turniers) können nicht unentschieden enden – Beenden bei Gleichstand
+  ist in der UI (`Matches.razor`) deaktiviert und in `MatchControl.Finish`
+  serverseitig abgesichert (Liga/Gruppenphase-Remis bleibt erlaubt).
+- ✅ **Bugfixes** (nach Gesamtprüfung): Format-Wahl im Setup blieb wirkungslos
+  (`_overridden` nie gesetzt); `ResetResults` löschte Freilos-Teams aus
+  K.o.-Bäumen (nur noch der vorgerückte Slot wird geleert); Tor-Animation der
+  Tafel hing bis zu 8 s hinter dem MIRA-Stufe-B-Aufruf (`DetectGoal` vorgezogen).
 
 ## Verifikation
 
-- `dotnet build` + `dotnet test` grün (**28 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
-  `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, `UpdateTournament`,
+- `dotnet build` + `dotnet test` grün (**31 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
+  `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, K.o.-Reset erhält Freilos-Teams,
+  Golden-Goal-Sperre (K.o.-Remis wirft, Liga-Remis erlaubt), `UpdateTournament`,
   `SettingsService`).
 - End-to-End geprüft: Boot/Migration, alle Routen 200, `--seed`, Live-Tafel,
   Ruhe-Ansicht mit Spielplan, publizierte `.exe` inkl. Static Assets.

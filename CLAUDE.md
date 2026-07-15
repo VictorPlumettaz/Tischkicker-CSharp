@@ -40,7 +40,8 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
   **Tabelle + Spielplan**.
 - Teams werden **am Veranstaltungstag** manuell angelegt (CRUD muss schnell sein).
 - **Spielmodus:** Zeitmodus mit einstellbarer Halbzeitdauer (Standard 6 Min) und
-  1 oder 2 Halbzeiten. Gleichstand: Liga/Gruppe = Remis; K.o. = Golden Goal.
+  1 oder 2 Halbzeiten. Gleichstand: Liga/Gruppe = Remis; K.o. = Golden Goal
+  (Beenden bei Gleichstand in UI **und** `MatchControl.Finish` gesperrt).
 - **Tabellenwertung:** 3-1-0, Tiebreaker Tordifferenz → erzielte Tore → Team-ID.
 - **ELO:** K=32, JS-identische Rundung (`(int)Math.Floor(x + 0.5)`), Startwert 1000.
 - **MIRA Stufe B** darf **nie** ein harter Abhängigkeitsfaktor sein: ohne
@@ -88,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (28 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (31 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -99,4 +100,6 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 🟢 Meilensteine **C1–C7 abgeschlossen** (Gerüst, Core, Datenschicht, Services,
 Blazor-UI, MIRA A+B, Verpackung). Zusätzlich nachgezogen: Browser-Auto-Start,
 Turnier **bearbeiten** + **zurücksetzen**, Tafel-**Spielplan** im Ruhezustand,
-Verteil-ZIP. 28 Tests grün. Details/History: `PLAN.md`.
+Verteil-ZIP, **Golden-Goal-Sperre** (K.o.-Remis nicht beendbar) sowie drei
+Bugfixes (Format-Override im Setup, K.o.-Reset erhält Freilos-Teams,
+Tor-Animation vor MIRA-Aufruf). 31 Tests grün. Details/History: `PLAN.md`.

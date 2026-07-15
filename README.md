@@ -16,7 +16,8 @@ JavaScript.
   und **löschen**.
 - **Spielerfassung** mit Spieluhr (Start/Pause/Fortsetzen), Halbzeiten,
   Tor-Buttons; **Uhr-Korrektur** (±10 s / ±1 min) und **Ergebnis-Korrektur**
-  nachträglich (Tabelle und ELO werden neu berechnet).
+  nachträglich (Tabelle und ELO werden neu berechnet). K.o.-Spiele können nicht
+  unentschieden enden (**Golden Goal** – „Beenden" ist erst mit Sieger möglich).
 - **Wertung**: ELO (K=32, JS-identische Rundung) + 3-1-0-Tabellen mit
   Tiebreakern (Punkte → Tordifferenz → Tore → Team-ID).
 - **Live-Anzeigetafel** (`/live`, schwarzer Hintergrund): großes Ergebnis,
@@ -37,7 +38,7 @@ JavaScript.
 | `Tischkicker.Data` | EF Core + SQLite (`AppDbContext`, Entities, Migrationen) |
 | `Tischkicker.Services` | `MatchControl`, `TournamentSetup`, `SettingsService`, `MiraService`, `LiveNotifier` |
 | `Tischkicker.Web` | ASP.NET Core + Blazor Server (Bedien-Oberfläche + `/live`) |
-| `Tischkicker.Tests` | xUnit (28 Tests) |
+| `Tischkicker.Tests` | xUnit (31 Tests) |
 
 **Echtzeit**: statt SSE ein Singleton `LiveNotifier` (C#-Event). Steuer-Aktionen
 lösen es aus; die Live-Komponente rendert neu, der Blazor-Server-Circuit pusht
