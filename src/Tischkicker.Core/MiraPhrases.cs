@@ -119,6 +119,13 @@ public static class MiraPhrases
             "Gleichstand nach der Zeit – jetzt zählt jeder Schuss! 🥅",
             "Sudden Death! Wer trifft, gewinnt! 🔥",
         ],
+        [MiraMood.Champion] =
+        [
+            "🏆 {scorer} ist Turniersieger! Was für eine Leistung – herzlichen Glückwunsch!",
+            "Der Champion steht fest: {scorer}! Riesenapplaus! 🎉",
+            "{scorer} holt den Titel, {other} auf einem starken 2. Platz – bravo euch beiden! 👏",
+            "Und der Pokal geht an … {scorer}! Ein würdiger Sieger des Turniers! 🏆",
+        ],
         [MiraMood.KnockoutStart] =
         [
             "Die Gruppenphase ist Geschichte – jetzt beginnt die K.o.-Phase! 🏆",

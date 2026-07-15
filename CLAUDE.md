@@ -89,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (43 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (44 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -127,5 +127,7 @@ Gruppen-Turnieren automatisch die K.o.-Phase, sobald das letzte Gruppenspiel
 beendet ist (`TryGenerateKnockout`; manueller Button auf `/rankings` bleibt als
 Fallback). MIRA sagt den Übergang an (neuer Mood **`KnockoutStart`**), inkl.
 K.o.-Baum in `BuildSituation` (Runden/Paarungen, mögliche Finalpaarungen).
-43 Tests grün.
+Neuer Mood **`Champion`**: sobald der Turniersieger feststeht (Siegerehrung),
+feiert MIRA ihn einmalig (`_championAnnouncedTid` in `Live.razor`; gilt auch für
+Liga-Sieger). 44 Tests grün.
 Details/History: `PLAN.md`.

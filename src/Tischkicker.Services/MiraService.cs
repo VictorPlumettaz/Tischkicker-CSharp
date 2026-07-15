@@ -130,6 +130,7 @@ public class MiraService(SettingsService settings)
             MiraMood.TimeUp => $"Die reguläre Spielzeit im Spiel {a} gegen {b} ist gerade abgelaufen.{score} Fasse in EINEM kurzen Satz zusammen, wie das Spiel ausging (Sieger oder Remis).",
             MiraMood.FinalMinute => $"Die Schlussphase im Spiel {a} gegen {b} läuft – nur noch{ClockText(ctx)} zu spielen.{score} Heize die Spannung an.",
             MiraMood.GoldenGoal => $"Golden Goal! Das K.o.-Spiel {a} gegen {b} steht nach Ablauf der regulären Zeit unentschieden{score} – jetzt entscheidet das nächste Tor.",
+            MiraMood.Champion => $"Das Turnier ist entschieden – {scorer} ist Turniersieger{(ctx.Other is { } ru ? $", vor dem Zweitplatzierten {ru}" : "")}! Gratuliere dem Sieger überschwänglich, würdige den Finalgegner und beende die Veranstaltung feierlich. (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
             MiraMood.KnockoutStart => "Die Gruppenphase ist beendet – jetzt beginnt die K.o.-Phase! Verkünde das mitreißend, nenne die ersten K.o.-Paarungen aus dem Kontext und spekuliere augenzwinkernd, wer sich vielleicht bis ins Finale durchsetzen oder wer dort aufeinandertreffen könnte. (Hier ausnahmsweise 2-3 Sätze erlaubt; klar als Möglichkeit formulieren, nichts als sicher behaupten.)",
             MiraMood.Interlude => $"Gib einen kurzen Zwischenkommentar zum laufenden Spiel {a} gegen {b}.{score} Nimm dabei Bezug auf den Turnierverlauf, die Tabelle oder die Chancen der Teams.",
             _ => $"Kommentiere die aktuelle Situation im Spiel {a} gegen {b}.{score}",

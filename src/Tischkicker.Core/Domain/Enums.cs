@@ -54,4 +54,6 @@ public enum MiraMood
     Interlude,
     /// <summary>Gruppenphase beendet, K.o.-Phase beginnt – Baum/Paarungen ansagen.</summary>
     KnockoutStart,
+    /// <summary>Turnier entschieden – Turniersieger feiern (zur Siegerehrung).</summary>
+    Champion,
 }

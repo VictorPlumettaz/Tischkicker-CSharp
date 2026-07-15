@@ -219,6 +219,14 @@ public class MiraTests
     }
 
     [Fact]
+    public void Comment_Champion_NamesWinner()
+    {
+        var text = MiraPhrases.Comment(
+            new MiraContext { Mood = MiraMood.Champion, Scorer = "Blau", Other = "Rot" }, _ => 0);
+        Assert.Contains("Blau", text);
+    }
+
+    [Fact]
     public void Tip_NeutralWhenClose()
     {
         var tip = MiraTipEngine.Compute(1000, 1000, "A", "B");

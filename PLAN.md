@@ -110,10 +110,15 @@ Anthropic C#-SDK mit automatischem Fallback; DB unter `%LOCALAPPDATA%\Tischkicke
   `KnockoutStart`, einmalig via `DetectKnockoutStart` in `Live.razor`) und sagt
   Beginn + erste Paarungen + mögliche Finalpaarungen an; `BuildSituation` liefert
   dafür den **K.o.-Baum** (Runden, Paarungen, „(noch offen)" für offene Slots).
+- ✅ **MIRA-Sieger-Kommentar**: neuer Mood `Champion`, den `Live.razor` einmalig
+  auslöst, sobald der Turniersieger feststeht (parallel zur automatischen
+  Siegerehrung; `_championAnnouncedTid`). Feiert Sieger + Zweitplatzierten, gilt
+  auch für Liga-Sieger. Kein Spiel um Platz 3 (Single Elimination, n−1 Spiele) –
+  Siegerehrung zeigt nur 1. + 2. Platz.
 
 ## Verifikation
 
-- `dotnet build` + `dotnet test` grün (**43 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
+- `dotnet build` + `dotnet test` grün (**44 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
   `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, K.o.-Reset erhält Freilos-Teams,
   Golden-Goal-Sperre (K.o.-Remis wirft, Liga-Remis erlaubt), `UpdateTournament`,
   `SettingsService` (inkl. `interludeSec`-Persistenz + Bereichsprüfung),

@@ -169,6 +169,8 @@
 
     // Merkt, für welches Turnier der K.o.-Start bereits angesagt wurde (einmalig pro Turnier).
     private int _koAnnouncedTid;
+    // Merkt, für welches Turnier der Turniersieger bereits gefeiert wurde (einmalig pro Turnier).
+    private int _championAnnouncedTid;
 
     // Zeit-Trigger-Zustand (pro laufendem Spiel).
     // Abstand periodischer Zwischenkommentare – aus den MIRA-Settings, bei jedem Reload aufgefrischt.
@@ -243,6 +245,17 @@
         var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name, _aWasBehind, _bWasBehind);
         // Gerade automatisch erzeugte K.o.-Phase hat Vorrang vor der normalen Ankündigung.
         if (_current is null && DetectKnockoutStart() is { } koCtx) ctx = koCtx;
+        // Turniersieger feiern (einmalig, hat höchste Priorität zur Siegerehrung).
+        if (_champion is { } champ && _activeTid is { } champTid && _championAnnouncedTid != champTid)
+        {
+            _championAnnouncedTid = champTid;
+            ctx = new MiraContext
+            {
+                Mood = MiraMood.Champion,
+                Scorer = Name(champ.WinnerId),
+                Other = champ.RunnerId is { } r ? Name(r) : null,
+            };
+        }
         _prevForMira = _current;
 
         // Rückstands-Historie mit dem aktuellen Stand fortschreiben (nach dem Ableiten).
