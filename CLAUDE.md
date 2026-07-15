@@ -89,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (31 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (33 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -100,6 +100,12 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 🟢 Meilensteine **C1–C7 abgeschlossen** (Gerüst, Core, Datenschicht, Services,
 Blazor-UI, MIRA A+B, Verpackung). Zusätzlich nachgezogen: Browser-Auto-Start,
 Turnier **bearbeiten** + **zurücksetzen**, Tafel-**Spielplan** im Ruhezustand,
-Verteil-ZIP, **Golden-Goal-Sperre** (K.o.-Remis nicht beendbar) sowie drei
+Verteil-ZIP, **Golden-Goal-Sperre** (K.o.-Remis nicht beendbar), drei
 Bugfixes (Format-Override im Setup, K.o.-Reset erhält Freilos-Teams,
-Tor-Animation vor MIRA-Aufruf). 31 Tests grün. Details/History: `PLAN.md`.
+Tor-Animation vor MIRA-Aufruf) sowie drei UX-Erweiterungen:
+**„Nächstes Spiel"-Button** in der Steuerung (`GetNextScheduled`),
+**Live-Tabelle** rechnet das laufende Spiel provisorisch mit (`Standings.Compute`
+`includeLive`) + sofortiger Push vor dem MIRA-Aufruf, und **MIRA** kommentiert
+jetzt zeitbezogen (Schlussphase, Golden Goal, periodische Zwischenkommentare)
+sowie mit Turnier-/Tabellenkontext (`BuildSituation`). 33 Tests grün.
+Details/History: `PLAN.md`.

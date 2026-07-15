@@ -42,4 +42,10 @@ public enum MiraMood
     Halftime,
     Win,
     Draw,
+    /// <summary>Schlussphase – letzte Minute einer Halbzeit.</summary>
+    FinalMinute,
+    /// <summary>K.o.-Spiel: reguläre Zeit abgelaufen, aber Gleichstand (Golden Goal).</summary>
+    GoldenGoal,
+    /// <summary>Periodischer Zwischenkommentar ohne konkretes Ereignis (mit Turnier-/Tabellenbezug).</summary>
+    Interlude,
 }

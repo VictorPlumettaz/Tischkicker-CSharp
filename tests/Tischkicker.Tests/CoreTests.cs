@@ -97,6 +97,25 @@ public class StandingsTests
         var rows = Standings.Compute([1, 2], [live]);
         Assert.All(rows, r => Assert.Equal(0, r.Played));
     }
+
+    [Fact]
+    public void IncludeLive_CountsRunningMatchProvisionally()
+    {
+        var live = new Match { TeamAId = 1, TeamBId = 2, ScoreA = 5, ScoreB = 0, Status = MatchStatus.Live };
+        var rows = Standings.Compute([1, 2], [live], includeLive: true);
+        Assert.Equal(1, rows[0].TeamId);   // Team 1 führt provisorisch
+        Assert.Equal(3, rows[0].Points);   // Sieg-Zwischenstand → 3 Punkte
+        Assert.Equal(5, rows[0].GoalDiff);
+        Assert.All(rows, r => Assert.Equal(1, r.Played));
+    }
+
+    [Fact]
+    public void IncludeLive_StillIgnoresScheduledMatches()
+    {
+        var sched = new Match { TeamAId = 1, TeamBId = 2, ScoreA = 0, ScoreB = 0, Status = MatchStatus.Scheduled };
+        var rows = Standings.Compute([1, 2], [sched], includeLive: true);
+        Assert.All(rows, r => Assert.Equal(0, r.Played));
+    }
 }
 
 public class MatchClockTests

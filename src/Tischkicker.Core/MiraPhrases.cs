@@ -13,6 +13,16 @@ public sealed record MiraContext
     public string? Other { get; init; }
     public int? ScoreA { get; init; }
     public int? ScoreB { get; init; }
+    /// <summary>Verbleibende Sekunden in der laufenden Halbzeit (für zeitbezogene Kommentare).</summary>
+    public int? RemainingSec { get; init; }
+    /// <summary>Aktuelle Halbzeit / Gesamtzahl Halbzeiten.</summary>
+    public int? Half { get; init; }
+    public int? Halves { get; init; }
+    /// <summary>
+    /// Kompakter Turnier-/Tabellenkontext (Stand, letzte Ergebnisse, offene Spiele).
+    /// Nur Stufe B (Claude) wertet ihn aus; Stufe A ignoriert ihn.
+    /// </summary>
+    public string? Situation { get; init; }
 }
 
 /// <summary>
@@ -83,6 +93,24 @@ public static class MiraPhrases
             "Unentschieden! Beide Teams haben sich einen Punkt verdient. 🤝",
             "Remis – ein faires Ergebnis für {a} und {b}! ⚖️",
             "Punkteteilung! Das war ein ausgeglichenes Duell. 🤝",
+        ],
+        [MiraMood.FinalMinute] =
+        [
+            "Die Schlussphase läuft – jetzt zählt jede Sekunde! ⏱️",
+            "Letzte Minute! Wer will den Sieg mehr? 🔥",
+            "Gleich ist Schluss – noch ist alles drin! ⚽",
+        ],
+        [MiraMood.GoldenGoal] =
+        [
+            "Golden Goal! Das nächste Tor entscheidet – Nervenkitzel pur! ⚡",
+            "Gleichstand nach der Zeit – jetzt zählt jeder Schuss! 🥅",
+            "Sudden Death! Wer trifft, gewinnt! 🔥",
+        ],
+        [MiraMood.Interlude] =
+        [
+            "Spannendes Spiel hier am Tisch – bleibt dran! ⚽",
+            "Weiter geht's – die Kugel rollt und rollt! 🔄",
+            "MIRA schaut gebannt zu – was für ein Turnier! 🏆",
         ],
     };
 

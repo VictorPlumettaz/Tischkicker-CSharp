@@ -22,14 +22,18 @@ public static class Standings
     /// Tabelle aus den beendeten Spielen (3 Punkte Sieg, 1 Remis, 0 Niederlage).
     /// Sortierung: Punkte → Tordifferenz → erzielte Tore → Team-ID. Reine Funktion.
     /// Es zählen nur beendete Spiele, bei denen beide Teams zur Menge gehören.
+    /// Mit <paramref name="includeLive"/> wird ein gerade laufendes Spiel mit seinem
+    /// aktuellen Zwischenstand provisorisch mitgerechnet (Live-Tabelle).
     /// </summary>
-    public static List<StandingsRow> Compute(IReadOnlyList<int> teamIds, IEnumerable<Match> matches)
+    public static List<StandingsRow> Compute(
+        IReadOnlyList<int> teamIds, IEnumerable<Match> matches, bool includeLive = false)
     {
         var rows = teamIds.ToDictionary(id => id, id => new StandingsRow { TeamId = id });
 
         foreach (var m in matches)
         {
-            if (m.Status != MatchStatus.Finished) continue;
+            if (m.Status == MatchStatus.Scheduled) continue;
+            if (m.Status != MatchStatus.Finished && !includeLive) continue;
             if (m.TeamAId is not { } aid || m.TeamBId is not { } bid) continue;
             if (!rows.TryGetValue(aid, out var a) || !rows.TryGetValue(bid, out var b)) continue;
 

@@ -22,6 +22,9 @@ public class MiraService(SettingsService settings)
         - Genau EIN kurzer, knackiger Live-Kommentar (maximal 1-2 Sätze).
         - Ton: begeistert, sportlich, humorvoll und wohlwollend zu beiden Teams.
         - Passende Emojis sind erlaubt (sparsam).
+        - Wenn dir Turnier-/Tabellenkontext gegeben wird, beziehe dich gern konkret darauf
+          (Tabellenplatz, Punkte, Torverhältnis, Chancen, letzte Ergebnisse) – aber wähle nur
+          EINEN interessanten Aspekt aus, lies niemals die ganze Tabelle vor.
         - Gib ausschließlich den Spruch aus – keine Anführungszeichen, keine Einleitung, keine Erklärung.
         """;
 
@@ -98,9 +101,9 @@ public class MiraService(SettingsService settings)
         var a = ctx.TeamA ?? "Team A";
         var b = ctx.TeamB ?? "Team B";
         var scorer = ctx.Scorer ?? "das Team";
-        var score = ctx.ScoreA is { } sa && ctx.ScoreB is { } sb ? $" Aktueller Spielstand: {sa}:{sb}." : "";
+        var score = ctx.ScoreA is { } sa && ctx.ScoreB is { } sb ? $" Aktueller Spielstand: {a} {sa}:{sb} {b}." : "";
 
-        return ctx.Mood switch
+        var basePrompt = ctx.Mood switch
         {
             MiraMood.Idle => "Begrüße das Publikum am A+W Tischkicker-Turnier, während gerade kein Spiel läuft.",
             MiraMood.Announce => $"Kündige das nächste Spiel an: {a} gegen {b}.",
@@ -109,10 +112,25 @@ public class MiraService(SettingsService settings)
             MiraMood.Equalizer => $"{scorer} hat gerade den Ausgleich erzielt.{score}",
             MiraMood.Comeback => $"{scorer} hat gerade das Spiel gedreht und liegt nun vorn.{score}",
             MiraMood.Extend => $"{scorer} hat nachgelegt und die Führung ausgebaut.{score}",
-            MiraMood.Halftime => "Halbzeit – die Teams wechseln die Seiten und machen kurz Pause.",
+            MiraMood.Halftime => $"Halbzeit im Spiel {a} gegen {b} – die Teams machen kurz Pause.{score}",
             MiraMood.Win => $"Abpfiff! {scorer} gewinnt das Spiel {a} gegen {b}.{score}",
             MiraMood.Draw => $"Das Spiel {a} gegen {b} endet unentschieden.{score}",
-            _ => $"Kommentiere die aktuelle Situation im Spiel {a} gegen {b}.",
+            MiraMood.FinalMinute => $"Die Schlussphase im Spiel {a} gegen {b} läuft – nur noch{ClockText(ctx)} zu spielen.{score} Heize die Spannung an.",
+            MiraMood.GoldenGoal => $"Golden Goal! Das K.o.-Spiel {a} gegen {b} steht nach Ablauf der regulären Zeit unentschieden{score} – jetzt entscheidet das nächste Tor.",
+            MiraMood.Interlude => $"Gib einen kurzen Zwischenkommentar zum laufenden Spiel {a} gegen {b}.{score} Nimm dabei Bezug auf den Turnierverlauf, die Tabelle oder die Chancen der Teams.",
+            _ => $"Kommentiere die aktuelle Situation im Spiel {a} gegen {b}.{score}",
         };
+
+        if (ctx.Half is { } h && ctx.Halves is { } hv && hv > 1 && ctx.Mood is not MiraMood.Idle and not MiraMood.Announce)
+            basePrompt += $" (Halbzeit {h} von {hv}.)";
+
+        if (!string.IsNullOrWhiteSpace(ctx.Situation))
+            basePrompt += $"\n\nTurnier-Kontext (nur zur Orientierung, such dir einen Aspekt aus):\n{ctx.Situation}";
+
+        return basePrompt;
     }
+
+    /// <summary>Verbleibende Spielzeit als „m:ss" für den Prompt (falls vorhanden).</summary>
+    private static string ClockText(MiraContext ctx) =>
+        ctx.RemainingSec is { } r && r > 0 ? $" {r / 60}:{r % 60:00} Minuten" : " wenige Sekunden";
 }

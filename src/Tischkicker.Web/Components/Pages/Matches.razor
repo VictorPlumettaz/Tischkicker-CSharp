@@ -93,6 +93,7 @@ else
         {
             <div class="card" style="margin:0">Endstand: @Name(m.TeamAId) @m.ScoreA : @m.ScoreB @Name(m.TeamBId)</div>
             <button class="btn-ghost" @onclick="() => _correcting = !_correcting">@(_correcting ? "✓ Korrektur fertig" : "✎ Ergebnis korrigieren")</button>
+            @if (_nextUp is { } nu) { <button class="btn-aw" @onclick="() => Open(nu)">Nächstes Spiel: @Name(nu.TeamAId) vs. @Name(nu.TeamBId) →</button> }
         }
     </div>
     @if (finished && _correcting) { <p class="muted" style="margin-top:0.75rem">Passe den Endstand über die +/-‑Buttons an. Tabelle und ELO werden neu berechnet.</p> }
@@ -104,6 +105,7 @@ else
     private List<Match> _matches = [];
     private Dictionary<int, string> _names = new();
     private Match? _selected;
+    private Match? _nextUp;
     private Tournament? _tournament;
     private string? _error;
     private bool _correcting;
@@ -127,8 +129,14 @@ else
         _selected = m; _correcting = false; _error = null;
         await using var db = await Dbf.CreateDbContextAsync();
         _tournament = await db.Tournaments.FindAsync(m.TournamentId);
+        RefreshNextUp();
         EnsureTicker();
     }
+
+    /// <summary>Bei beendetem Spiel das nächste anstehende Spiel desselben Turniers ermitteln.</summary>
+    private void RefreshNextUp() =>
+        _nextUp = _selected is { Status: MatchStatus.Finished } m
+            ? Control.GetNextScheduled(m.TournamentId, m.Id) : null;
 
     private async Task Back()
     {
@@ -138,7 +146,7 @@ else
 
     private void Act(Func<Match> fn)
     {
-        try { _selected = fn(); _error = null; EnsureTicker(); }
+        try { _selected = fn(); _error = null; RefreshNextUp(); EnsureTicker(); }
         catch (Exception e) { _error = e.Message; }
     }
 

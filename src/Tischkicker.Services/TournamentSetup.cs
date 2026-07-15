@@ -212,8 +212,11 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         return db.Matches.Where(m => m.TournamentId == tournamentId).OrderBy(m => m.Id).ToList();
     }
 
-    /// <summary>Tabellen: Liga → eine, Gruppen → je Gruppe, K.o. → keine.</summary>
-    public StandingsResponse GetStandings(int tournamentId)
+    /// <summary>
+    /// Tabellen: Liga → eine, Gruppen → je Gruppe, K.o. → keine. Mit
+    /// <paramref name="includeLive"/> zählt ein laufendes Spiel provisorisch mit.
+    /// </summary>
+    public StandingsResponse GetStandings(int tournamentId, bool includeLive = false)
     {
         using var db = dbf.CreateDbContext();
         var tournament = db.Tournaments.Find(tournamentId)
@@ -227,13 +230,13 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
             foreach (var name in roster.Where(r => r.GroupName != null).Select(r => r.GroupName!).Distinct().OrderBy(x => x))
             {
                 var ids = roster.Where(r => r.GroupName == name).Select(r => r.TeamId).ToList();
-                groups.Add(new StandingsGroup(name, Standings.Compute(ids, matches.Where(m => m.GroupName == name))));
+                groups.Add(new StandingsGroup(name, Standings.Compute(ids, matches.Where(m => m.GroupName == name), includeLive)));
             }
         }
         else if (tournament.Format == TournamentFormat.RoundRobin)
         {
             var ids = roster.Select(r => r.TeamId).ToList();
-            groups.Add(new StandingsGroup(null, Standings.Compute(ids, matches)));
+            groups.Add(new StandingsGroup(null, Standings.Compute(ids, matches, includeLive)));
         }
         return new StandingsResponse(tournament.Format, groups);
     }

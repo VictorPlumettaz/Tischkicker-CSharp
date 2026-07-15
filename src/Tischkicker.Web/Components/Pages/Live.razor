@@ -157,9 +157,17 @@
 
     private string _miraText = "";
     private Match? _prevForMira;
+    private bool _miraBusy;
     private (int Id, int A, int B)? _prevScore;
     private string? _goalSide;
     private int _goalKey;
+
+    // Zeit-Trigger-Zustand (pro laufendem Spiel).
+    private const long InterludeIntervalMs = 120_000; // periodischer Zwischenkommentar alle 2 Min
+    private int _timeMatchId;
+    private int _finalMinuteHalf;
+    private bool _goldenGoalAnnounced;
+    private long _lastInterludeMs;
 
     private System.Threading.Timer? _clock;
     private System.Threading.Timer? _goalClear;
@@ -168,10 +176,18 @@
     {
         Notifier.Changed += OnChanged;
         await Reload();
-        _clock = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 250, 250);
+        // Ticker: rendert die Uhr weiter UND prüft zeitbezogene MIRA-Anlässe.
+        _clock = new System.Threading.Timer(_ => InvokeAsync(Tick), null, 250, 250);
     }
 
-    private void OnChanged() => _ = InvokeAsync(async () => { await Reload(); StateHasChanged(); });
+    private void OnChanged() => _ = InvokeAsync(Reload);
+
+    /// <summary>Läuft alle 250 ms: Uhr neu rendern + zeitbezogene MIRA-Kommentare auslösen.</summary>
+    private async Task Tick()
+    {
+        if (!_miraBusy && DetectTimeContext() is { } ctx) await EmitMira(ctx);
+        StateHasChanged();
+    }
 
     private async Task Reload()
     {
@@ -190,7 +206,8 @@
             ?? _tournaments.FirstOrDefault(t => _matches.Any(m => m.TournamentId == t.Id))?.Id;
         _activeTid = activeTid;
         _currentTournament = _tournaments.FirstOrDefault(t => t.Id == activeTid);
-        _standings = activeTid is { } tid ? Setup.GetStandings(tid) : null;
+        // Live-Tabelle: laufendes Spiel wird mit seinem Zwischenstand provisorisch mitgerechnet.
+        _standings = activeTid is { } tid ? Setup.GetStandings(tid, includeLive: true) : null;
 
         _currentIds = new HashSet<int>(new[] { _current?.TeamAId, _current?.TeamBId }.Where(x => x is not null).Select(x => x!.Value));
         _upcoming = _matches.Where(m => m.Status == MatchStatus.Scheduled && m.Id != _current?.Id).Take(8).ToList();
@@ -200,10 +217,13 @@
         // Tor-Animation sofort auslösen – vor dem evtl. langsamen KI-Aufruf.
         DetectGoal(_current);
 
-        // MIRA-Kommentar bei Spielübergängen.
+        // Tabelle + Spielstand SOFORT pushen, unabhängig vom evtl. langsamen MIRA-Aufruf.
+        StateHasChanged();
+
+        // MIRA-Kommentar bei Spielübergängen (Tor, Anpfiff, Halbzeit, Ende …).
         var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name);
         _prevForMira = _current;
-        if (ctx is not null) _miraText = await Mira.CommentAsync(ctx);
+        if (ctx is not null) await EmitMira(ctx);
     }
 
     private (int, int?)? ComputeChampion(int? activeTid)
@@ -247,6 +267,137 @@
     }
 
     private string Name(int? id) => id is { } i && _names.TryGetValue(i, out var n) ? n : "—";
+
+    /// <summary>Verbleibende Sekunden der laufenden Halbzeit (null, wenn kein Spiel läuft).</summary>
+    private int? CurrentRemainingSec()
+    {
+        if (_current is not { } m) return null;
+        var half = _currentTournament?.HalfDurationSec ?? 360;
+        return (int)Math.Ceiling(MatchClock.RemainingSeconds(
+            new ClockState(m.ElapsedSec, m.TimerRunning, m.TimerStartedAtMs), half, MatchControl.NowMs()));
+    }
+
+    /// <summary>
+    /// Prüft zeitbezogene MIRA-Anlässe des laufenden Spiels: Golden Goal (Zeit abgelaufen +
+    /// K.o.-Gleichstand), Schlussphase (letzte Minute) und periodische Zwischenkommentare.
+    /// Jeder Anlass feuert höchstens einmal (Entprellung über Zustandsfelder).
+    /// </summary>
+    private MiraContext? DetectTimeContext()
+    {
+        if (_current is not { TimerRunning: true } m) return null;
+
+        // Zustand bei Spielwechsel zurücksetzen.
+        if (_timeMatchId != m.Id)
+        {
+            _timeMatchId = m.Id;
+            _finalMinuteHalf = 0;
+            _goldenGoalAnnounced = false;
+            _lastInterludeMs = MatchControl.NowMs();
+        }
+
+        var remaining = CurrentRemainingSec() ?? 0;
+        var tied = m.ScoreA == m.ScoreB;
+        var isKo = _currentTournament?.Format == TournamentFormat.Knockout
+            || (_currentTournament?.Format == TournamentFormat.Groups && m.GroupName is null);
+        var a = Name(m.TeamAId);
+        var b = Name(m.TeamBId);
+
+        // Golden Goal: reguläre Zeit abgelaufen, K.o.-Spiel, Gleichstand – einmalig.
+        if (remaining <= 0 && isKo && tied && !_goldenGoalAnnounced)
+        {
+            _goldenGoalAnnounced = true;
+            return new MiraContext { Mood = MiraMood.GoldenGoal, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB };
+        }
+
+        // Schlussphase: letzte Minute – einmal je Halbzeit.
+        if (remaining is > 0 and <= 60 && _finalMinuteHalf != m.CurrentHalf)
+        {
+            _finalMinuteHalf = m.CurrentHalf;
+            return new MiraContext { Mood = MiraMood.FinalMinute, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB, RemainingSec = remaining };
+        }
+
+        // Periodischer Zwischenkommentar (alle 2 Min), nicht in der Schlussminute.
+        var now = MatchControl.NowMs();
+        if (remaining > 65 && now - _lastInterludeMs >= InterludeIntervalMs)
+        {
+            _lastInterludeMs = now;
+            return new MiraContext { Mood = MiraMood.Interlude, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB, RemainingSec = remaining };
+        }
+
+        return null;
+    }
+
+    /// <summary>Reichert den Kontext um Zeit + Turnier-/Tabellenkontext an und holt den MIRA-Spruch (Overlap-geschützt).</summary>
+    private async Task EmitMira(MiraContext ctx)
+    {
+        if (_miraBusy) return;
+        _miraBusy = true;
+        try
+        {
+            var enriched = ctx with
+            {
+                Situation = BuildSituation(),
+                RemainingSec = ctx.RemainingSec ?? CurrentRemainingSec(),
+                Half = _current?.CurrentHalf,
+                Halves = _currentTournament?.Halves,
+            };
+            _miraText = await Mira.CommentAsync(enriched);
+            await InvokeAsync(StateHasChanged);
+        }
+        finally { _miraBusy = false; }
+    }
+
+    /// <summary>Kompakter Turnier-/Tabellenkontext für MIRA Stufe B (Stand, letzte Ergebnisse, offene Spiele).</summary>
+    private string? BuildSituation()
+    {
+        if (_activeTid is not { } tid) return null;
+        var tm = _matches.Where(m => m.TournamentId == tid).ToList();
+        if (tm.Count == 0) return null;
+
+        var sb = new System.Text.StringBuilder();
+        var fmtLabel = _currentTournament?.Format switch
+        {
+            TournamentFormat.Knockout => "K.o.-System",
+            TournamentFormat.Groups => "Gruppenphase + K.o.",
+            _ => "Liga (jeder gegen jeden)",
+        };
+        sb.AppendLine($"Turnier \"{_currentTournament?.Name}\", Format: {fmtLabel}.");
+
+        var groups = _standings?.Groups.Where(g => g.Rows.Count > 0).ToList() ?? [];
+        foreach (var g in groups)
+        {
+            sb.AppendLine(g.GroupName is null ? "Tabelle:" : $"Gruppe {g.GroupName}:");
+            var rank = 1;
+            foreach (var row in g.Rows)
+            {
+                var diff = row.GoalDiff > 0 ? $"+{row.GoalDiff}" : row.GoalDiff.ToString();
+                sb.AppendLine($"  {rank}. {Name(row.TeamId)} – {row.Points} Pkt, {row.GoalsFor}:{row.GoalsAgainst} Tore ({diff}), {row.Played} Sp.");
+                rank++;
+            }
+        }
+        if (groups.Count > 0)
+            sb.AppendLine("(Ein laufendes Spiel ist im Zwischenstand bereits eingerechnet.)");
+
+        var recent = tm.Where(m => m.Status == MatchStatus.Finished)
+            .OrderByDescending(m => m.FinishedAt).ThenByDescending(m => m.Id).Take(3).ToList();
+        if (recent.Count > 0)
+        {
+            sb.AppendLine("Letzte Ergebnisse:");
+            foreach (var m in recent)
+                sb.AppendLine($"  {Name(m.TeamAId)} {m.ScoreA}:{m.ScoreB} {Name(m.TeamBId)}");
+        }
+
+        var open = tm.Where(m => m.Status == MatchStatus.Scheduled && m.TeamAId is not null && m.TeamBId is not null)
+            .OrderBy(m => m.Round ?? 0).ThenBy(m => m.Id).Take(4).ToList();
+        if (open.Count > 0)
+        {
+            sb.AppendLine("Noch ausstehend:");
+            foreach (var m in open)
+                sb.AppendLine($"  {Name(m.TeamAId)} vs. {Name(m.TeamBId)}");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 
     /// <summary>Gliedert den Spielplan: Gruppen → je Gruppe (+ K.o.), K.o. → je Runde, Liga → flach.</summary>
     private List<(string? Header, List<Match> Rows)> BuildPlan(List<Match> plan)

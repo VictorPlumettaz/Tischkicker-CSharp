@@ -139,6 +139,23 @@ public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifi
         return Commit(db, m);
     }
 
+    /// <summary>
+    /// Nächstes noch nicht gestartetes Spiel im selben Turnier (nach Runde, dann Id).
+    /// Bevorzugt Paarungen, bei denen bereits beide Teams feststehen. <c>null</c>,
+    /// wenn kein weiteres Spiel ansteht.
+    /// </summary>
+    public Match? GetNextScheduled(int tournamentId, int excludeMatchId)
+    {
+        using var db = dbf.CreateDbContext();
+        var scheduled = db.Matches
+            .Where(m => m.TournamentId == tournamentId
+                && m.Status == MatchStatus.Scheduled && m.Id != excludeMatchId)
+            .OrderBy(m => m.Round ?? 0).ThenBy(m => m.Id)
+            .ToList();
+        return scheduled.FirstOrDefault(m => m.TeamAId is not null && m.TeamBId is not null)
+            ?? scheduled.FirstOrDefault();
+    }
+
     /// <summary>Legt ein schnelles Freundschaftsspiel an (eigenes Sammel-Turnier).</summary>
     public Match CreateFriendly(int teamAId, int teamBId)
     {
