@@ -26,6 +26,8 @@ public class Tournament
     public int HalfDurationSec { get; set; } = 360;
     /// <summary>Anzahl Halbzeiten (1 oder 2).</summary>
     public int Halves { get; set; } = 1;
+    /// <summary>K.o./Gruppen: zusätzliches Spiel um Platz 3 (Verlierer der Halbfinals).</summary>
+    public bool ThirdPlaceMatch { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -55,6 +57,13 @@ public class Match
     // K.o.-Advancement: Sieger rückt in NextMatchId / NextSlot ("a"|"b").
     public int? NextMatchId { get; set; }
     public string? NextSlot { get; set; }
+
+    // K.o.-Advancement des VERLIERERS (nur für „Spiel um Platz 3" gesetzt).
+    public int? LoserNextMatchId { get; set; }
+    public string? LoserNextSlot { get; set; }
+
+    /// <summary>Kennzeichnet das Spiel um Platz 3 (Bronze).</summary>
+    public bool IsThirdPlace { get; set; }
 }
 
 /// <summary>Ein Team im Turnier-Kader (mit optionaler Gruppe/Setzung).</summary>

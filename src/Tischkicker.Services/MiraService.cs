@@ -28,6 +28,12 @@ public class MiraService(SettingsService settings)
           nur ganz selten und dezent einstreuen – nicht in jedem Kommentar, sie sind die Ausnahme, nicht die Regel.
         - Überrasche mit frischen Bildern, Vergleichen und Pointen – wiederhole dich nie.
 
+        Turnierphase:
+        - Dir wird die Art des aktuellen Spiels genannt (z. B. Gruppenspiel, Viertelfinale, Halbfinale,
+          Finale, Spiel um Platz 3, Ligaspiel). Beziehe dich IMMER korrekt darauf.
+        - Verwechsle niemals ein K.o.-Spiel mit einem Gruppenspiel. Über die Gruppenphase darfst du
+          rückblickend sprechen – aber nur als abgeschlossene Vergangenheit, nie als das laufende Spiel.
+
         Format:
         - Antworte immer auf Deutsch.
         - Genau EIN Kommentar, kurz und knackig (1-2 Sätze), sofort auf den Punkt.
@@ -135,6 +141,9 @@ public class MiraService(SettingsService settings)
             MiraMood.Interlude => $"Gib einen kurzen Zwischenkommentar zum laufenden Spiel {a} gegen {b}.{score} Nimm dabei Bezug auf den Turnierverlauf, die Tabelle oder die Chancen der Teams.",
             _ => $"Kommentiere die aktuelle Situation im Spiel {a} gegen {b}.{score}",
         };
+
+        if (!string.IsNullOrWhiteSpace(ctx.Phase) && ctx.Mood is not MiraMood.Idle and not MiraMood.KnockoutStart and not MiraMood.Champion)
+            basePrompt = $"[Art des aktuellen Spiels: {ctx.Phase}]\n{basePrompt}";
 
         if (ctx.Half is { } h && ctx.Halves is { } hv && hv > 1 && ctx.Mood is not MiraMood.Idle and not MiraMood.Announce)
             basePrompt += $" (Halbzeit {h} von {hv}.)";

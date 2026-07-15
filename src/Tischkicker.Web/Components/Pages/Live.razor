@@ -26,12 +26,16 @@
         <section class="live-center">
             @if (_champion is not null)
             {
-                <div class="ceremony animate-goal-banner">
+                <div class="ceremony animate-ceremony">
                     <div class="trophy animate-trophy">🏆</div>
                     <div class="title">Turniersieger</div>
                     <div class="winner">@Name(_champion.Value.WinnerId)</div>
-                    @if (_champion.Value.RunnerId is { } r) { <div class="runner">2. Platz: <strong style="color:rgba(255,255,255,0.8)">@Name(r)</strong></div> }
-                    <div style="margin-top:1.5rem; font-size:1.25rem; opacity:0.5">Herzlichen Glückwunsch! 🎉</div>
+                    <div class="podium">
+                        <div class="podium-row gold" style="animation-delay:0.6s"><span class="medal">🥇</span><span class="pl">@Name(_champion.Value.WinnerId)</span></div>
+                        @if (_champion.Value.RunnerId is { } r) { <div class="podium-row silver" style="animation-delay:1.1s"><span class="medal">🥈</span><span class="pl">@Name(r)</span></div> }
+                        @if (_champion.Value.ThirdId is { } th) { <div class="podium-row bronze" style="animation-delay:1.6s"><span class="medal">🥉</span><span class="pl">@Name(th)</span></div> }
+                    </div>
+                    <div class="ceremony-sub">Herzlichen Glückwunsch! 🎉</div>
                 </div>
             }
             else if (_current is { } m)
@@ -154,7 +158,7 @@
     private int? _activeTid;
     private HashSet<int> _currentIds = [];
     private List<Match> _upcoming = [];
-    private (int WinnerId, int? RunnerId)? _champion;
+    private (int WinnerId, int? RunnerId, int? ThirdId)? _champion;
 
     private string _miraText = "";
     private Match? _prevForMira;
@@ -268,7 +272,7 @@
         if (ctx is not null) await EmitMira(ctx);
     }
 
-    private (int, int?)? ComputeChampion(int? activeTid)
+    private (int WinnerId, int? RunnerId, int? ThirdId)? ComputeChampion(int? activeTid)
     {
         if (activeTid is null || _current is not null) return null;
         var tm = _matches.Where(m => m.TournamentId == activeTid).ToList();
@@ -277,15 +281,21 @@
         var bracket = tm.Where(m => m.GroupName is null && m.Round is not null).ToList();
         if (bracket.Count > 0)
         {
-            var final = bracket.OrderByDescending(m => m.Round).First();
-            if (final.TeamAId is null || final.TeamBId is null || final.ScoreA == final.ScoreB) return null;
+            var final = bracket.Where(m => !m.IsThirdPlace).OrderByDescending(m => m.Round).FirstOrDefault();
+            if (final is null || final.TeamAId is null || final.TeamBId is null || final.ScoreA == final.ScoreB) return null;
             var aWins = final.ScoreA > final.ScoreB;
-            return (aWins ? final.TeamAId!.Value : final.TeamBId!.Value, aWins ? final.TeamBId : final.TeamAId);
+
+            int? third = null;
+            if (bracket.FirstOrDefault(m => m.IsThirdPlace) is { TeamAId: not null, TeamBId: not null } bronze
+                && bronze.ScoreA != bronze.ScoreB)
+                third = bronze.ScoreA > bronze.ScoreB ? bronze.TeamAId : bronze.TeamBId;
+
+            return (aWins ? final.TeamAId!.Value : final.TeamBId!.Value, aWins ? final.TeamBId : final.TeamAId, third);
         }
         if (_currentTournament?.Format == TournamentFormat.RoundRobin)
         {
             var rows = _standings?.Groups.FirstOrDefault()?.Rows ?? [];
-            if (rows.Count >= 3) return (rows[0].TeamId, rows.Count > 1 ? rows[1].TeamId : null);
+            if (rows.Count >= 3) return (rows[0].TeamId, rows[1].TeamId, rows[2].TeamId);
         }
         return null;
     }
@@ -392,6 +402,7 @@
                 RemainingSec = ctx.RemainingSec ?? CurrentRemainingSec(),
                 Half = _current?.CurrentHalf,
                 Halves = _currentTournament?.Halves,
+                Phase = ctx.Phase ?? PhaseOf(_current ?? _next),
             };
             _miraText = await Mira.CommentAsync(enriched);
             await InvokeAsync(StateHasChanged);
@@ -487,13 +498,10 @@
         if (bracket.Count > 0)
         {
             string SlotName(int? id) => id is null ? "(noch offen)" : Name(id);
+            var maxRound = MaxKoRound(bracket);
             sb.AppendLine("K.o.-Baum:");
-            foreach (var rg in bracket.GroupBy(m => m.Round!.Value).OrderBy(g => g.Key))
-            {
-                sb.AppendLine($"  {RoundLabel(rg.Key, bracket)}:");
-                foreach (var km in rg.OrderBy(m => m.Id))
-                    sb.AppendLine($"    {SlotName(km.TeamAId)} vs. {SlotName(km.TeamBId)}");
-            }
+            foreach (var km in bracket.OrderBy(m => m.IsThirdPlace ? 1 : 0).ThenBy(m => m.Round).ThenBy(m => m.Id))
+                sb.AppendLine($"  {KoLabel(km, maxRound)}: {SlotName(km.TeamAId)} vs. {SlotName(km.TeamBId)}");
         }
 
         var recent = tm.Where(m => m.Status == MatchStatus.Finished)
@@ -528,14 +536,11 @@
             foreach (var g in plan.Where(m => m.GroupName != null).GroupBy(m => m.GroupName!).OrderBy(g => g.Key))
                 sections.Add(($"Gruppe {g.Key}", g.OrderBy(m => m.Id).ToList()));
             var ko = plan.Where(m => m.GroupName == null).OrderBy(m => m.Round).ThenBy(m => m.Id).ToList();
-            if (ko.Count > 0)
-                foreach (var r in ko.GroupBy(m => m.Round ?? 0).OrderBy(g => g.Key))
-                    sections.Add((RoundLabel(r.Key, ko), r.OrderBy(m => m.Id).ToList()));
+            AddKoSections(sections, ko);
         }
         else if (fmt == TournamentFormat.Knockout)
         {
-            foreach (var r in plan.GroupBy(m => m.Round ?? 0).OrderBy(g => g.Key))
-                sections.Add((RoundLabel(r.Key, plan), r.OrderBy(m => m.Id).ToList()));
+            AddKoSections(sections, plan);
         }
         else
         {
@@ -544,17 +549,47 @@
         return sections;
     }
 
-    /// <summary>Runden-Beschriftung im K.o. (Finale/Halbfinale/Viertelfinale, sonst „Runde N").</summary>
-    private static string RoundLabel(int round, List<Match> bracket)
+    /// <summary>Fügt K.o.-Spiele runden­weise als Sektionen an; das Spiel um Platz 3 bekommt eine eigene.</summary>
+    private static void AddKoSections(List<(string?, List<Match>)> sections, List<Match> ko)
     {
-        var max = bracket.Count > 0 ? bracket.Max(m => m.Round ?? 0) : round;
-        return (max - round) switch
+        if (ko.Count == 0) return;
+        var maxRound = MaxKoRound(ko);
+        foreach (var r in ko.GroupBy(m => m.Round ?? 0).OrderBy(g => g.Key))
         {
-            0 => "Finale",
-            1 => "Halbfinale",
-            2 => "Viertelfinale",
-            _ => $"Runde {round}",
-        };
+            var normal = r.Where(m => !m.IsThirdPlace).OrderBy(m => m.Id).ToList();
+            if (normal.Count > 0) sections.Add((RoundLabel(r.Key, maxRound), normal));
+            var bronze = r.Where(m => m.IsThirdPlace).OrderBy(m => m.Id).ToList();
+            if (bronze.Count > 0) sections.Add(("Spiel um Platz 3", bronze));
+        }
+    }
+
+    /// <summary>Runden-Beschriftung im K.o. (Finale/Halbfinale/Viertelfinale, sonst „Runde N").</summary>
+    private static string RoundLabel(int round, int maxRound) => (maxRound - round) switch
+    {
+        0 => "Finale",
+        1 => "Halbfinale",
+        2 => "Viertelfinale",
+        _ => $"Runde {round}",
+    };
+
+    /// <summary>Label eines K.o.-Spiels inkl. Sonderfall „Spiel um Platz 3".</summary>
+    private static string KoLabel(Match m, int maxRound) =>
+        m.IsThirdPlace ? "Spiel um Platz 3" : RoundLabel(m.Round ?? 0, maxRound);
+
+    /// <summary>Höchste K.o.-Runde (ohne Bronze-Spiel) einer Match-Liste.</summary>
+    private static int MaxKoRound(IEnumerable<Match> bracket) =>
+        bracket.Where(m => !m.IsThirdPlace).Select(m => m.Round ?? 0).DefaultIfEmpty(0).Max();
+
+    /// <summary>Art des aktuellen Spiels für MIRA (Ligaspiel/Gruppenspiel/Runde/Spiel um Platz 3).</summary>
+    private string? PhaseOf(Match? m)
+    {
+        if (m is null) return null;
+        var fmt = _currentTournament?.Format;
+        if (fmt == TournamentFormat.RoundRobin) return "Ligaspiel";
+        if (fmt == TournamentFormat.Groups && m.GroupName is not null) return $"Gruppenspiel (Gruppe {m.GroupName})";
+        if (m.IsThirdPlace) return "Spiel um Platz 3";
+        var bracket = _matches.Where(x => x.TournamentId == m.TournamentId && x.GroupName is null && x.Round is not null).ToList();
+        return RoundLabel(m.Round ?? 0, MaxKoRound(bracket));
     }
 
     private static string FormatClock(double totalSec)

@@ -23,6 +23,11 @@ public sealed record MiraContext
     /// Nur Stufe B (Claude) wertet ihn aus; Stufe A ignoriert ihn.
     /// </summary>
     public string? Situation { get; init; }
+    /// <summary>
+    /// Art des aktuellen Spiels (z. B. „Gruppenspiel (Gruppe A)", „Halbfinale", „Finale",
+    /// „Spiel um Platz 3", „Ligaspiel"). Verhindert, dass MIRA die Turnierphase verwechselt.
+    /// </summary>
+    public string? Phase { get; init; }
 }
 
 /// <summary>

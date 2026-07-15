@@ -16,7 +16,8 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
 {
     public static FormatRecommendation Recommend(int teamCount) => FormatAdvisor.Recommend(teamCount);
 
-    public Tournament CreateTournament(string name, TournamentFormat format, int halves, int halfDurationSec)
+    public Tournament CreateTournament(string name, TournamentFormat format, int halves, int halfDurationSec,
+        bool thirdPlaceMatch = false)
     {
         using var db = dbf.CreateDbContext();
         var t = new Tournament
@@ -25,6 +26,7 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
             Format = format,
             Halves = halves is 1 or 2 ? halves : 1,
             HalfDurationSec = halfDurationSec > 0 ? halfDurationSec : 360,
+            ThirdPlaceMatch = thirdPlaceMatch && format != TournamentFormat.RoundRobin,
         };
         db.Tournaments.Add(t);
         db.SaveChanges();
@@ -33,7 +35,8 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
     }
 
     /// <summary>Aktualisiert die Stammdaten eines Turniers (Name, Format, Halbzeiten, Dauer).</summary>
-    public Tournament UpdateTournament(int tournamentId, string name, TournamentFormat format, int halves, int halfDurationSec)
+    public Tournament UpdateTournament(int tournamentId, string name, TournamentFormat format, int halves, int halfDurationSec,
+        bool thirdPlaceMatch = false)
     {
         using var db = dbf.CreateDbContext();
         var t = db.Tournaments.Find(tournamentId)
@@ -42,6 +45,7 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         t.Format = format;
         t.Halves = halves is 1 or 2 ? halves : 1;
         t.HalfDurationSec = halfDurationSec > 0 ? halfDurationSec : 360;
+        t.ThirdPlaceMatch = thirdPlaceMatch && format != TournamentFormat.RoundRobin;
         db.SaveChanges();
         notifier.NotifyChanged();
         return t;
@@ -75,12 +79,16 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         // Nur Slots leeren, die erst durchs Vorrücken befüllt werden (aus NextSlot der
         // zubringenden Spiele). Vorbelegte Freilos-Slots bleiben erhalten.
         var fedSlots = new Dictionary<int, HashSet<string>>();
-        foreach (var m in matches.Where(m => m.NextMatchId is not null && m.NextSlot is not null))
+        void MarkFed(int matchId, string slot)
         {
-            if (!fedSlots.TryGetValue(m.NextMatchId!.Value, out var slots))
-                fedSlots[m.NextMatchId!.Value] = slots = [];
-            slots.Add(m.NextSlot!);
+            if (!fedSlots.TryGetValue(matchId, out var slots)) fedSlots[matchId] = slots = [];
+            slots.Add(slot);
         }
+        foreach (var m in matches.Where(m => m.NextMatchId is not null && m.NextSlot is not null))
+            MarkFed(m.NextMatchId!.Value, m.NextSlot!);
+        // Auch die Slots des Spiels um Platz 3 (aus den Verlierer-Wegen) werden leergeräumt.
+        foreach (var m in matches.Where(m => m.LoserNextMatchId is not null && m.LoserNextSlot is not null))
+            MarkFed(m.LoserNextMatchId!.Value, m.LoserNextSlot!);
 
         foreach (var m in matches)
         {
@@ -145,7 +153,7 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         if (ids.Count < 2)
             throw new TournamentSetupException("Für einen Spielplan werden mindestens zwei Teams benötigt.");
 
-        var pairings = Schedule.Generate(tournament.Format, ids);
+        var pairings = Schedule.Generate(tournament.Format, ids, tournament.ThirdPlaceMatch);
 
         db.Matches.RemoveRange(db.Matches.Where(m => m.TournamentId == tournamentId));
         db.SaveChanges();
@@ -207,7 +215,7 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
             throw new TournamentSetupException("Zu wenige Qualifikanten für eine K.o.-Phase.");
 
         var maxGroupRound = groupMatches.Max(m => m.Round ?? 1);
-        PersistPairings(db, tournamentId, Schedule.Knockout(seedList), maxGroupRound);
+        PersistPairings(db, tournamentId, Schedule.Knockout(seedList, tournament.ThirdPlaceMatch), maxGroupRound);
         notifier.NotifyChanged();
         return db.Matches.Where(m => m.TournamentId == tournamentId).OrderBy(m => m.Id).ToList();
     }
@@ -259,6 +267,7 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
                 Round = p.Round + roundOffset,
                 GroupName = p.GroupName,
                 BracketSlot = p.Slot.ToString(),
+                IsThirdPlace = p.IsThirdPlace,
             };
             db.Matches.Add(m);
             db.SaveChanges(); // ID materialisieren
@@ -266,10 +275,17 @@ public sealed class TournamentSetup(IDbContextFactory<AppDbContext> dbf, LiveNot
         }
         foreach (var p in pairings)
         {
-            if (p.FeedsInto is not { } f) continue;
             var m = db.Matches.Find(idBySlot[(p.Round, p.Slot)])!;
-            m.NextMatchId = idBySlot[(f.Round, f.Slot)];
-            m.NextSlot = f.Side;
+            if (p.FeedsInto is { } f)
+            {
+                m.NextMatchId = idBySlot[(f.Round, f.Slot)];
+                m.NextSlot = f.Side;
+            }
+            if (p.LoserFeedsInto is { } lf)
+            {
+                m.LoserNextMatchId = idBySlot[(lf.Round, lf.Slot)];
+                m.LoserNextSlot = lf.Side;
+            }
         }
         db.SaveChanges();
     }

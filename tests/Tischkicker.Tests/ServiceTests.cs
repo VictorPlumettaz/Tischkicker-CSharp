@@ -344,5 +344,42 @@ public class TournamentSetupServiceTests : IDisposable
         Assert.False(db.Matches.Any(m => m.TournamentId == t.Id && m.GroupName == null));
     }
 
+    [Fact]
+    public void Knockout_WithThirdPlace_WiresLosersIntoBronze()
+    {
+        var ids = Teams(4);
+        var t = _setup.CreateTournament("Cup", TournamentFormat.Knockout, 1, 360, thirdPlaceMatch: true);
+        _setup.SetTeams(t.Id, ids);
+        var matches = _setup.Generate(t.Id);
+
+        // 2 Halbfinals + Finale + Spiel um Platz 3 = 4 Spiele.
+        Assert.Equal(4, matches.Count);
+        var bronze = matches.Single(m => m.IsThirdPlace);
+        Assert.Equal(2, matches.Count(m => m.LoserNextMatchId == bronze.Id)); // beide HF speisen den Verlierer ein
+
+        // Halbfinals spielen (Team A gewinnt) → Verlierer laufen ins Bronze-Spiel.
+        foreach (var sf in matches.Where(m => !m.IsThirdPlace && m.NextMatchId != null))
+        {
+            _control.Start(sf.Id, MatchControl.NowMs());
+            _control.AdjustScore(sf.Id, "a", 1);
+            _control.Finish(sf.Id, MatchControl.NowMs());
+        }
+        using var db = _dbf.CreateDbContext();
+        var b = db.Matches.Find(bronze.Id)!;
+        Assert.NotNull(b.TeamAId);
+        Assert.NotNull(b.TeamBId);
+    }
+
+    [Fact]
+    public void Knockout_WithoutThirdPlace_HasNoBronze()
+    {
+        var ids = Teams(4);
+        var t = _setup.CreateTournament("Cup", TournamentFormat.Knockout, 1, 360);
+        _setup.SetTeams(t.Id, ids);
+        var matches = _setup.Generate(t.Id);
+        Assert.Equal(3, matches.Count);                       // 2 HF + Finale
+        Assert.DoesNotContain(matches, m => m.IsThirdPlace);
+    }
+
     public void Dispose() => _dbf.Dispose();
 }

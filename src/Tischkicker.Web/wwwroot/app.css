@@ -98,9 +98,25 @@ table.data td, table.data th { padding: 0.5rem 0.75rem; border-bottom: 1px solid
 /* Siegerehrung */
 .ceremony { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .trophy { font-size: clamp(5rem, 12vw, 10rem); line-height: 1; }
-.ceremony .title { margin-top: 0.5rem; font-size: 1.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3em; color: var(--aw-accent); }
-.ceremony .winner { margin-top: 0.75rem; font-size: clamp(3rem, 9vw, 8rem); font-weight: 900; line-height: 1; text-shadow: 0 0 40px rgba(255,180,0,0.5); }
-.ceremony .runner { margin-top: 1.5rem; font-size: 1.5rem; color: rgba(255,255,255,0.6); }
+.ceremony .title { margin-top: 0.5rem; font-size: 1.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3em; color: var(--aw-accent); opacity: 0; animation: fade-up 1.2s ease 0.3s forwards; }
+.ceremony .winner { margin-top: 0.75rem; font-size: clamp(3rem, 9vw, 8rem); font-weight: 900; line-height: 1; text-shadow: 0 0 40px rgba(255,180,0,0.5); opacity: 0; animation: fade-up 1.4s ease 0.5s forwards; }
+.ceremony-sub { margin-top: 1.75rem; font-size: 1.25rem; opacity: 0; animation: fade-up 1.2s ease 2.1s forwards; }
+
+/* Podium 1./2./3. Platz – dauerhaft eingeblendet, gestaffelt enthüllt */
+.ceremony .podium { margin-top: 1.75rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: min(28rem, 70vw); }
+.podium-row { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1.25rem; border-radius: 0.75rem; font-weight: 800;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  opacity: 0; transform: translateY(20px); animation: fade-up 0.9s ease forwards; }
+.podium-row .medal { font-size: 1.9rem; }
+.podium-row .pl { font-size: clamp(1.25rem, 3vw, 2rem); }
+.podium-row.gold { background: linear-gradient(90deg, rgba(255,196,0,0.28), rgba(255,196,0,0.06)); border-color: rgba(255,196,0,0.5); }
+.podium-row.silver { background: linear-gradient(90deg, rgba(203,213,225,0.22), rgba(203,213,225,0.05)); border-color: rgba(203,213,225,0.4); }
+.podium-row.bronze { background: linear-gradient(90deg, rgba(205,127,50,0.24), rgba(205,127,50,0.05)); border-color: rgba(205,127,50,0.45); }
+
+@keyframes fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+/* Langsamer, epischer Auftritt der gesamten Siegerehrung */
+@keyframes ceremony-in { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+.animate-ceremony { animation: ceremony-in 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 /* Tor-Banner + Ball */
 .goal-banner { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -113,7 +129,7 @@ table.data td, table.data th { padding: 0.5rem 0.75rem; border-bottom: 1px solid
 .animate-goal-banner { animation: goal-banner-a 1.8s ease forwards; }
 @keyframes ball-roll { 0% { transform: translateX(-12vw) rotate(0);} 12% { transform: translateX(112vw) rotate(1440deg);} 100% { transform: translateX(112vw) rotate(1440deg);} }
 .animate-ball-roll { animation: ball-roll 18s linear infinite; }
-@keyframes trophy-float { 0%,100% { transform: translateY(0) rotate(-4deg);} 50% { transform: translateY(-14px) rotate(4deg);} }
-.animate-trophy { animation: trophy-float 2.4s ease-in-out infinite; }
+@keyframes trophy-float { 0%,100% { transform: translateY(0) rotate(-4deg) scale(1);} 50% { transform: translateY(-20px) rotate(4deg) scale(1.06);} }
+.animate-trophy { animation: trophy-float 3.6s ease-in-out infinite; filter: drop-shadow(0 0 30px rgba(255,196,0,0.55)); }
 
 #blazor-error-ui { display: none; }

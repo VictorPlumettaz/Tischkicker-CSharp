@@ -136,6 +136,16 @@ public sealed class MatchControl(IDbContextFactory<AppDbContext> dbf, LiveNotifi
                 if (slot == "a") nextM.TeamAId = winnerId; else nextM.TeamBId = winnerId;
             }
         }
+
+        // K.o.: Verlierer ins Spiel um Platz 3 vorrücken (nur bei gesetztem Verlierer-Weg).
+        if (m.LoserNextMatchId is { } lNextId && m.LoserNextSlot is { } lSlot)
+        {
+            var loserId = m.ScoreA > m.ScoreB ? m.TeamBId : m.ScoreB > m.ScoreA ? m.TeamAId : null;
+            if (loserId is not null && db.Matches.Find(lNextId) is { } lNextM)
+            {
+                if (lSlot == "a") lNextM.TeamAId = loserId; else lNextM.TeamBId = loserId;
+            }
+        }
         db.SaveChanges();
 
         // War das das letzte offene Gruppenspiel? Dann die K.o.-Phase automatisch erzeugen.

@@ -12,7 +12,9 @@ public readonly record struct Pairing(
     int? TeamAId,
     int? TeamBId,
     string? GroupName = null,
-    Feed? FeedsInto = null);
+    Feed? FeedsInto = null,
+    Feed? LoserFeedsInto = null,
+    bool IsThirdPlace = false);
 
 /// <summary>Spielplan-Generierung als reine Logik (keine DB).</summary>
 public static class Schedule
@@ -72,8 +74,11 @@ public static class Schedule
         return seeds;
     }
 
-    /// <summary>K.o.-System (Single Elimination) mit Freilosen; immer n−1 Spiele.</summary>
-    public static List<Pairing> Knockout(IReadOnlyList<int> teamIds)
+    /// <summary>
+    /// K.o.-System (Single Elimination) mit Freilosen; n−1 Spiele (plus optional ein
+    /// Spiel um Platz 3, in das die beiden Halbfinal-Verlierer einlaufen).
+    /// </summary>
+    public static List<Pairing> Knockout(IReadOnlyList<int> teamIds, bool thirdPlace = false)
     {
         var n = teamIds.Count;
         if (n < 2) return [];
@@ -119,6 +124,20 @@ public static class Schedule
                 pairings.Add(new Pairing(r, s, pf.A, pf.B, FeedsInto: FeedOf(r, s)));
             }
         }
+
+        // Optionales Spiel um Platz 3: braucht ein Halbfinale (2 Spiele in Runde totalRounds-1).
+        if (thirdPlace && totalRounds >= 2)
+        {
+            var semiRound = totalRounds - 1;
+            var bronzeSlot = 1; // Finale liegt auf Slot 0 derselben Runde
+            pairings.Add(new Pairing(totalRounds, bronzeSlot, null, null, IsThirdPlace: true));
+            for (var i = 0; i < pairings.Count; i++)
+            {
+                var p = pairings[i];
+                if (p.Round == semiRound && !p.IsThirdPlace)
+                    pairings[i] = p with { LoserFeedsInto = new Feed(totalRounds, bronzeSlot, p.Slot == 0 ? "a" : "b") };
+            }
+        }
         return pairings;
     }
 
@@ -150,10 +169,10 @@ public static class Schedule
     }
 
     /// <summary>Dispatcher passend zum Format.</summary>
-    public static List<Pairing> Generate(TournamentFormat format, IReadOnlyList<int> teamIds) => format switch
+    public static List<Pairing> Generate(TournamentFormat format, IReadOnlyList<int> teamIds, bool thirdPlace = false) => format switch
     {
         TournamentFormat.RoundRobin => RoundRobin(teamIds),
-        TournamentFormat.Knockout => Knockout(teamIds),
+        TournamentFormat.Knockout => Knockout(teamIds, thirdPlace),
         TournamentFormat.Groups => GroupStage(teamIds),
         _ => [],
     };

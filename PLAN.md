@@ -113,19 +113,34 @@ Anthropic C#-SDK mit automatischem Fallback; DB unter `%LOCALAPPDATA%\Tischkicke
 - ✅ **MIRA-Sieger-Kommentar**: neuer Mood `Champion`, den `Live.razor` einmalig
   auslöst, sobald der Turniersieger feststeht (parallel zur automatischen
   Siegerehrung; `_championAnnouncedTid`). Feiert Sieger + Zweitplatzierten, gilt
-  auch für Liga-Sieger. Kein Spiel um Platz 3 (Single Elimination, n−1 Spiele) –
-  Siegerehrung zeigt nur 1. + 2. Platz.
+  auch für Liga-Sieger.
+- ✅ **Turnierphase für MIRA**: `MiraContext.Phase` (via `PhaseOf` in `Live.razor`)
+  nennt MIRA die Art des aktuellen Spiels (Ligaspiel/Gruppenspiel (Gruppe X)/
+  Viertelfinale/Halbfinale/Finale/Spiel um Platz 3). System-Prompt-Regel: K.o.-Spiel
+  nie mit Gruppenspiel verwechseln, Gruppenphase nur rückblickend. Behebt, dass
+  MIRA ein Finale für ein Gruppenspiel hielt.
+- ✅ **Spiel um Platz 3 (wählbar)**: `Tournament.ThirdPlaceMatch` (Setup-Checkbox
+  für K.o./Gruppen). `Schedule.Knockout(thirdPlace)` hängt ein Bronze-Spiel an und
+  leitet die Halbfinal-Verlierer über neue Match-Felder `LoserNextMatchId`/
+  `LoserNextSlot` (+ `IsThirdPlace`) hinein; `MatchControl.Finish` rückt den
+  Verlierer vor, `ResetResults` räumt auch diese Slots. EF-Migration
+  `ThirdPlaceMatch`.
+- ✅ **Siegerehrung epischer + Podium**: langsamer/gestaffelter Auftritt (CSS
+  `ceremony-in`/`fade-up`), dauerhaft eingeblendetes **Podium 1./2./3. Platz**
+  (🥇🥈🥉). `ComputeChampion` liefert zusätzlich den Dritten (Bronze-Sieger bzw.
+  Tabellen-Dritter in der Liga).
 
 ## Verifikation
 
-- `dotnet build` + `dotnet test` grün (**44 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
+- `dotnet build` + `dotnet test` grün (**46 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
   `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, K.o.-Reset erhält Freilos-Teams,
   Golden-Goal-Sperre (K.o.-Remis wirft, Liga-Remis erlaubt), `UpdateTournament`,
   `SettingsService` (inkl. `interludeSec`-Persistenz + Bereichsprüfung),
   `includeLive` (laufendes Spiel zählt mit / geplante nicht),
   `MiraNarrator`-Mood-Klassifikation (CloseGap/Equalizer/Lead/Extend/Comeback nach
   Rückstand, Endstand bei Abpfiff), Auto-K.o.-Phase nach letztem Gruppenspiel
-  (erzeugt Baum + blockiert erneuten Aufruf; nicht bei offenen Gruppenspielen)).
+  (erzeugt Baum + blockiert erneuten Aufruf; nicht bei offenen Gruppenspielen),
+  Spiel um Platz 3 (Bronze-Wiring + Verlierer-Vorrücken; ohne Option kein Bronze)).
 - End-to-End geprüft: Boot/Migration, alle Routen 200, `--seed`, Live-Tafel,
   Ruhe-Ansicht mit Spielplan, publizierte `.exe` inkl. Static Assets. Zuletzt
   bestätigt: Live-Tabelle zählt ein laufendes Gruppenspiel provisorisch mit.

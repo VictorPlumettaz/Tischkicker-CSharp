@@ -89,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (44 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (46 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -129,5 +129,12 @@ Fallback). MIRA sagt den Übergang an (neuer Mood **`KnockoutStart`**), inkl.
 K.o.-Baum in `BuildSituation` (Runden/Paarungen, mögliche Finalpaarungen).
 Neuer Mood **`Champion`**: sobald der Turniersieger feststeht (Siegerehrung),
 feiert MIRA ihn einmalig (`_championAnnouncedTid` in `Live.razor`; gilt auch für
-Liga-Sieger). 44 Tests grün.
+Liga-Sieger). **Turnierphase-Kontext:** `MiraContext.Phase` sagt MIRA die Art des
+aktuellen Spiels (Gruppenspiel/Halbfinale/Finale/Spiel um Platz 3/Ligaspiel),
+damit sie K.o.-Spiele nicht mit Gruppenspielen verwechselt (`PhaseOf`). **Spiel um
+Platz 3** ist im Setup **wählbar** (`Tournament.ThirdPlaceMatch`); der K.o.-Baum
+verdrahtet die Halbfinal-Verlierer über neue Match-Felder `LoserNextMatchId`/
+`LoserNextSlot` ins Bronze-Spiel (`IsThirdPlace`). Die **Siegerehrung** ist
+langsamer/epischer animiert und zeigt dauerhaft das **Podium 1./2./3. Platz**.
+46 Tests grün.
 Details/History: `PLAN.md`.

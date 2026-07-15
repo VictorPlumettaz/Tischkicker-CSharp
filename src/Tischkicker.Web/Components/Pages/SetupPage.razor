@@ -56,6 +56,14 @@
         <div><label class="muted">Minuten je Halbzeit</label><br />
             <input type="number" min="1" max="30" @bind="_minutes" style="width:6rem" />
         </div>
+        @if (_format != TournamentFormat.RoundRobin)
+        {
+            <div style="align-self:flex-end">
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:@(_editLocked ? "not-allowed" : "pointer")">
+                    <input type="checkbox" @bind="_thirdPlace" disabled="@_editLocked" /> Spiel um Platz 3
+                </label>
+            </div>
+        }
     </div>
 
     <button class="btn-aw" disabled="@(!CanSaveEdit)" @onclick="SaveEdit">
@@ -136,6 +144,14 @@ else
             <div><label class="muted">Minuten je Halbzeit</label><br />
                 <input type="number" min="1" max="30" @bind="_minutes" style="width:6rem" />
             </div>
+            @if (_format != TournamentFormat.RoundRobin)
+            {
+                <div style="align-self:flex-end">
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer">
+                        <input type="checkbox" @bind="_thirdPlace" /> Spiel um Platz 3
+                    </label>
+                </div>
+            }
         </div>
 
         <button class="btn-aw" disabled="@(!CanCreate)" @onclick="Create">Turnier anlegen &amp; Spielplan erzeugen</button>
@@ -151,6 +167,7 @@ else
     private TournamentFormat _format = TournamentFormat.RoundRobin;
     private int _halves = 1;
     private int _minutes = 6;
+    private bool _thirdPlace;
     private bool _overridden;
     private FormatRecommendation? _recommendation;
     private List<Match>? _generated;
@@ -195,7 +212,7 @@ else
         if (!CanCreate) return;
         try
         {
-            var t = Setup.CreateTournament(_name, _format, _halves, _minutes * 60);
+            var t = Setup.CreateTournament(_name, _format, _halves, _minutes * 60, _thirdPlace);
             Setup.SetTeams(t.Id, _selected.ToList());
             _generated = Setup.Generate(t.Id);
             _error = null;
@@ -211,6 +228,7 @@ else
         _format = t.Format;
         _halves = t.Halves;
         _minutes = Math.Max(1, t.HalfDurationSec / 60);
+        _thirdPlace = t.ThirdPlaceMatch;
         _selected.Clear();
         foreach (var tt in await db.TournamentTeams.Where(x => x.TournamentId == t.Id).OrderBy(x => x.Seed).ToListAsync())
             _selected.Add(tt.TeamId);
@@ -228,12 +246,12 @@ else
         {
             if (_editLocked)
             {
-                // Teams/Format bleiben unverändert – nur Stammdaten.
-                Setup.UpdateTournament(_editing.Id, _name, _editing.Format, _halves, _minutes * 60);
+                // Teams/Format bleiben unverändert – nur Stammdaten (inkl. Platz-3-Option).
+                Setup.UpdateTournament(_editing.Id, _name, _editing.Format, _halves, _minutes * 60, _thirdPlace);
             }
             else
             {
-                Setup.UpdateTournament(_editing.Id, _name, _format, _halves, _minutes * 60);
+                Setup.UpdateTournament(_editing.Id, _name, _format, _halves, _minutes * 60, _thirdPlace);
                 Setup.SetTeams(_editing.Id, _selected.ToList());
                 Setup.Generate(_editing.Id); // noch nichts gespielt → Spielplan gefahrlos neu erzeugen
             }
@@ -253,7 +271,7 @@ else
 
     private void ResetForm()
     {
-        _generated = null; _selected.Clear(); _name = ""; _overridden = false; _recommendation = null;
+        _generated = null; _selected.Clear(); _name = ""; _overridden = false; _recommendation = null; _thirdPlace = false;
     }
 
     private async Task Reset(Tournament t)
