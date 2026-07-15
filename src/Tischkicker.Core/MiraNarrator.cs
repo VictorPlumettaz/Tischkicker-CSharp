@@ -9,7 +9,10 @@ namespace Tischkicker.Core;
 /// </summary>
 public static class MiraNarrator
 {
-    public static MiraContext? Derive(Match? prev, Match? current, Match? next, Func<int?, string> teamName)
+    /// <param name="scorerAWasBehind">Ob Team A im bisherigen Spielverlauf schon einmal in Rückstand lag.</param>
+    /// <param name="scorerBWasBehind">Ob Team B im bisherigen Spielverlauf schon einmal in Rückstand lag.</param>
+    public static MiraContext? Derive(Match? prev, Match? current, Match? next, Func<int?, string> teamName,
+        bool scorerAWasBehind = false, bool scorerBWasBehind = false)
     {
         // Kein laufendes Spiel → nächstes ankündigen bzw. Leerlauf.
         if (current is null)
@@ -30,9 +33,9 @@ public static class MiraNarrator
         if (current.Status == MatchStatus.Finished)
         {
             if (current.ScoreA == current.ScoreB)
-                return new MiraContext { Mood = MiraMood.Draw, TeamA = a, TeamB = b };
+                return new MiraContext { Mood = MiraMood.Draw, TeamA = a, TeamB = b, ScoreA = current.ScoreA, ScoreB = current.ScoreB };
             var winner = current.ScoreA > current.ScoreB ? a : b;
-            return new MiraContext { Mood = MiraMood.Win, Scorer = winner, TeamA = a, TeamB = b };
+            return new MiraContext { Mood = MiraMood.Win, Scorer = winner, TeamA = a, TeamB = b, ScoreA = current.ScoreA, ScoreB = current.ScoreB };
         }
 
         // Neues Spiel geworden → Anpfiff.
@@ -50,14 +53,20 @@ public static class MiraNarrator
             var scoredA = current.ScoreA > prev.ScoreA;
             var scorer = scoredA ? a : b;
             var other = scoredA ? b : a;
+            var scorerWasBehind = scoredA ? scorerAWasBehind : scorerBWasBehind;
             var leadBefore = scoredA ? prev.ScoreA - prev.ScoreB : prev.ScoreB - prev.ScoreA;
             var leadAfter = scoredA ? current.ScoreA - current.ScoreB : current.ScoreB - current.ScoreA;
 
+            // Reihenfolge wichtig: erst der Endstand aus Sicht des Schützen (Ausgleich /
+            // weiter im Rückstand), dann die Führungswechsel.
             MiraMood mood;
-            if (leadAfter == 0) mood = MiraMood.Equalizer;
-            else if (leadBefore < 0 && leadAfter > 0) mood = MiraMood.Comeback;
-            else if (leadBefore <= 0) mood = MiraMood.Lead;
-            else mood = MiraMood.Extend;
+            if (leadAfter == 0) mood = MiraMood.Equalizer;      // exakter Ausgleich
+            else if (leadAfter < 0) mood = MiraMood.CloseGap;    // verkürzt, aber noch hinten
+            else if (leadBefore < 0) mood = MiraMood.Comeback;   // war hinten, jetzt vorn (Doppelschlag)
+            // Aus dem Gleichstand in Führung: „gedreht", falls der Schütze im Spiel schon zurücklag,
+            // sonst die (erste) Führung.
+            else if (leadBefore == 0) mood = scorerWasBehind ? MiraMood.Comeback : MiraMood.Lead;
+            else mood = MiraMood.Extend;                         // Führung ausgebaut
 
             return new MiraContext
             {

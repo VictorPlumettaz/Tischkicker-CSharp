@@ -10,10 +10,12 @@ public sealed record MiraConfig
     public bool StageBEnabled { get; init; }
     public string ApiKey { get; init; } = "";
     public string Model { get; init; } = SettingsService.DefaultModel;
+    /// <summary>Abstand periodischer Zwischenkommentare der Live-Tafel in Sekunden.</summary>
+    public int InterludeSec { get; init; } = SettingsService.DefaultInterludeSec;
 }
 
 /// <summary>Nach außen sichtbare Konfiguration: der API-Key wird nie geliefert, nur <see cref="HasApiKey"/>.</summary>
-public sealed record MiraConfigPublic(bool StageBEnabled, string Model, bool HasApiKey);
+public sealed record MiraConfigPublic(bool StageBEnabled, string Model, bool HasApiKey, int InterludeSec);
 
 /// <summary>
 /// Schlüssel/Wert-Zugriff auf die <c>Settings</c>-Tabelle mit getippten Helfern für
@@ -27,9 +29,16 @@ public class SettingsService(IDbContextFactory<AppDbContext> dbf)
     /// <summary>Standard: schnelles, günstiges Modell – passend für kurze Live-Sprüche.</summary>
     public const string DefaultModel = "claude-haiku-4-5";
 
+    /// <summary>Standard-Abstand periodischer Zwischenkommentare (Sekunden).</summary>
+    public const int DefaultInterludeSec = 30;
+    /// <summary>Erlaubte Unter-/Obergrenze für den Zwischenkommentar-Abstand (Sekunden).</summary>
+    public const int MinInterludeSec = 10;
+    public const int MaxInterludeSec = 600;
+
     private const string KeyStageB = "mira.stageBEnabled";
     private const string KeyApiKey = "mira.apiKey";
     private const string KeyModel = "mira.model";
+    private const string KeyInterlude = "mira.interludeSec";
 
     /// <summary>Vollständige Config inkl. API-Key – nur serverintern verwenden.</summary>
     public MiraConfig GetMiraConfig()
@@ -42,13 +51,18 @@ public class SettingsService(IDbContextFactory<AppDbContext> dbf)
             StageBEnabled = map.GetValueOrDefault(KeyStageB) == "true",
             ApiKey = map.GetValueOrDefault(KeyApiKey) ?? "",
             Model = model is not null && MiraModels.Contains(model) ? model : DefaultModel,
+            InterludeSec = ClampInterlude(
+                int.TryParse(map.GetValueOrDefault(KeyInterlude), out var iv) ? iv : DefaultInterludeSec),
         };
     }
+
+    /// <summary>Begrenzt den Zwischenkommentar-Abstand auf den erlaubten Bereich.</summary>
+    private static int ClampInterlude(int sec) => Math.Clamp(sec, MinInterludeSec, MaxInterludeSec);
 
     public MiraConfigPublic GetMiraConfigPublic()
     {
         var c = GetMiraConfig();
-        return new MiraConfigPublic(c.StageBEnabled, c.Model, c.ApiKey.Length > 0);
+        return new MiraConfigPublic(c.StageBEnabled, c.Model, c.ApiKey.Length > 0, c.InterludeSec);
     }
 
     /// <summary>
@@ -56,7 +70,8 @@ public class SettingsService(IDbContextFactory<AppDbContext> dbf)
     /// nicht-leer; <paramref name="clearApiKey"/> entfernt den gespeicherten Key.
     /// </summary>
     public MiraConfigPublic SetMiraConfig(
-        bool? stageBEnabled = null, string? model = null, string? apiKey = null, bool clearApiKey = false)
+        bool? stageBEnabled = null, string? model = null, string? apiKey = null, bool clearApiKey = false,
+        int? interludeSec = null)
     {
         using var db = dbf.CreateDbContext();
 
@@ -68,6 +83,12 @@ public class SettingsService(IDbContextFactory<AppDbContext> dbf)
         }
 
         if (stageBEnabled is { } sb) Set(KeyStageB, sb ? "true" : "false");
+        if (interludeSec is { } iv)
+        {
+            if (iv < MinInterludeSec || iv > MaxInterludeSec)
+                throw new ArgumentException($"Zwischenkommentar-Abstand muss zwischen {MinInterludeSec} und {MaxInterludeSec} Sekunden liegen.");
+            Set(KeyInterlude, iv.ToString());
+        }
         if (model is not null)
         {
             if (!MiraModels.Contains(model))

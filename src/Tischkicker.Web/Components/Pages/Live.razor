@@ -5,6 +5,7 @@
 @inject TournamentSetup Setup
 @inject MiraService Mira
 @inject LiveNotifier Notifier
+@inject SettingsService Cfg
 
 <PageTitle>Tischkicker – Live</PageTitle>
 
@@ -162,8 +163,13 @@
     private string? _goalSide;
     private int _goalKey;
 
+    // Rückstands-Historie des laufenden Spiels: lag ein Team schon mal hinten? (für „Spiel gedreht")
+    private int _behindMatchId;
+    private bool _aWasBehind, _bWasBehind;
+
     // Zeit-Trigger-Zustand (pro laufendem Spiel).
-    private const long InterludeIntervalMs = 120_000; // periodischer Zwischenkommentar alle 2 Min
+    // Abstand periodischer Zwischenkommentare – aus den MIRA-Settings, bei jedem Reload aufgefrischt.
+    private long _interludeIntervalMs = SettingsService.DefaultInterludeSec * 1000L;
     private int _timeMatchId;
     private int _finalMinuteHalf;
     private bool _goldenGoalAnnounced;
@@ -191,6 +197,8 @@
 
     private async Task Reload()
     {
+        _interludeIntervalMs = Cfg.GetMiraConfigPublic().InterludeSec * 1000L;
+
         await using var db = await Dbf.CreateDbContextAsync();
         _matches = await db.Matches.ToListAsync();
         _tournaments = await db.Tournaments.OrderByDescending(t => t.CreatedAt).ToListAsync();
@@ -220,9 +228,24 @@
         // Tabelle + Spielstand SOFORT pushen, unabhängig vom evtl. langsamen MIRA-Aufruf.
         StateHasChanged();
 
+        // Rückstands-Historie bei Spielwechsel zurücksetzen (Flags spiegeln den Verlauf bis _prevForMira).
+        if (_current is { } cm && _behindMatchId != cm.Id)
+        {
+            _behindMatchId = cm.Id;
+            _aWasBehind = _bWasBehind = false;
+        }
+
         // MIRA-Kommentar bei Spielübergängen (Tor, Anpfiff, Halbzeit, Ende …).
-        var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name);
+        var ctx = MiraNarrator.Derive(_prevForMira, _current, _next, Name, _aWasBehind, _bWasBehind);
         _prevForMira = _current;
+
+        // Rückstands-Historie mit dem aktuellen Stand fortschreiben (nach dem Ableiten).
+        if (_current is { } cur)
+        {
+            if (cur.ScoreA < cur.ScoreB) _aWasBehind = true;
+            if (cur.ScoreB < cur.ScoreA) _bWasBehind = true;
+        }
+
         if (ctx is not null) await EmitMira(ctx);
     }
 
@@ -318,7 +341,7 @@
 
         // Periodischer Zwischenkommentar (alle 2 Min), nicht in der Schlussminute.
         var now = MatchControl.NowMs();
-        if (remaining > 65 && now - _lastInterludeMs >= InterludeIntervalMs)
+        if (remaining > 65 && now - _lastInterludeMs >= _interludeIntervalMs)
         {
             _lastInterludeMs = now;
             return new MiraContext { Mood = MiraMood.Interlude, TeamA = a, TeamB = b, ScoreA = m.ScoreA, ScoreB = m.ScoreB, RemainingSec = remaining };
@@ -344,7 +367,9 @@
             _miraText = await Mira.CommentAsync(enriched);
             await InvokeAsync(StateHasChanged);
         }
-        finally { _miraBusy = false; }
+        // Nach JEDEM Kommentar (Tor, Anpfiff, Schlussphase …) die Interlude-Uhr neu starten,
+        // damit direkt nach einem Ereignis kein Zwischenkommentar hinterherfeuert.
+        finally { _miraBusy = false; _lastInterludeMs = MatchControl.NowMs(); }
     }
 
     /// <summary>Kompakter Turnier-/Tabellenkontext für MIRA Stufe B (Stand, letzte Ergebnisse, offene Spiele).</summary>
@@ -377,6 +402,33 @@
         }
         if (groups.Count > 0)
             sb.AppendLine("(Ein laufendes Spiel ist im Zwischenstand bereits eingerechnet.)");
+
+        // Duell-Historie der aktuell relevanten Paarung (laufendes bzw. nächstes Spiel),
+        // turnierübergreifend – gut für Anpfiff-Begrüßung und Zwischenkommentare.
+        var focus = _current ?? _next;
+        if (focus is { TeamAId: { } fa, TeamBId: { } fb })
+        {
+            var duels = _matches.Where(m => m.Status == MatchStatus.Finished && m.Id != focus.Id
+                    && ((m.TeamAId == fa && m.TeamBId == fb) || (m.TeamAId == fb && m.TeamBId == fa)))
+                .OrderByDescending(m => m.FinishedAt).ThenByDescending(m => m.Id).ToList();
+            if (duels.Count > 0)
+            {
+                int winA = 0, winB = 0, drawn = 0;
+                foreach (var d in duels)
+                {
+                    var ga = d.TeamAId == fa ? d.ScoreA : d.ScoreB; // Tore von Team fa
+                    var gb = d.TeamAId == fa ? d.ScoreB : d.ScoreA; // Tore von Team fb
+                    if (ga > gb) winA++; else if (gb > ga) winB++; else drawn++;
+                }
+                sb.AppendLine($"Direkte Duelle {Name(fa)} vs. {Name(fb)}: {winA} Siege {Name(fa)}, {winB} Siege {Name(fb)}, {drawn} Remis (aus {duels.Count} Spielen).");
+                var last = duels[0];
+                sb.AppendLine($"  Letztes Duell: {Name(last.TeamAId)} {last.ScoreA}:{last.ScoreB} {Name(last.TeamBId)}.");
+            }
+            else
+            {
+                sb.AppendLine($"Direkte Duelle {Name(fa)} vs. {Name(fb)}: noch nie gegeneinander gespielt – Premiere!");
+            }
+        }
 
         var recent = tm.Where(m => m.Status == MatchStatus.Finished)
             .OrderByDescending(m => m.FinishedAt).ThenByDescending(m => m.Id).Take(3).ToList();

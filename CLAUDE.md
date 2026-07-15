@@ -89,7 +89,7 @@ Plan + Status in [`PLAN.md`](./PLAN.md), Nutzer-Doku in [`README.md`](./README.m
 ## Nützliche Befehle
 
 - `dotnet build` – Solution bauen.
-- `dotnet test` – xUnit (33 Tests). **Achtung:** baut das Web-Projekt nicht mit;
+- `dotnet test` – xUnit (42 Tests). **Achtung:** baut das Web-Projekt nicht mit;
   für Razor-Prüfung `dotnet build src/Tischkicker.Web/...` ausführen.
 - `dotnet run --project src/Tischkicker.Web` – App (`:5088`).
 - `dotnet run --project src/Tischkicker.Web -- --seed` – Demodaten befüllen.
@@ -107,5 +107,18 @@ Tor-Animation vor MIRA-Aufruf) sowie drei UX-Erweiterungen:
 **Live-Tabelle** rechnet das laufende Spiel provisorisch mit (`Standings.Compute`
 `includeLive`) + sofortiger Push vor dem MIRA-Aufruf, und **MIRA** kommentiert
 jetzt zeitbezogen (Schlussphase, Golden Goal, periodische Zwischenkommentare)
-sowie mit Turnier-/Tabellenkontext (`BuildSituation`). 33 Tests grün.
+sowie mit Turnier-/Tabellenkontext (`BuildSituation`). **MIRA-Ausbau:**
+überdrehte, witzige A+W-Persona (Stufe-B-System-Prompt), Anpfiff-Begrüßung mit
+**Duell-Historie** (Head-to-Head in `BuildSituation`), Zwischenkommentare jetzt
+**alle 30 s** (Interlude-Uhr wird nach jedem Kommentar zurückgesetzt, feuert nie
+direkt nach einem Tor), neuer Mood **`CloseGap`** (Anschlusstreffer – behebt
+falsches „geht in Führung" beim Verkürzen aus dem Rückstand). Der
+Zwischenkommentar-Abstand ist über die **MIRA-Settings** konfigurierbar
+(`mira.interludeSec`, 10–600 s, Standard 30 s; `Live.razor` liest ihn je Reload).
+**Kommentar-Feinschliff:** Anpfiff nennt jetzt die **Perspektiven** (was jedes
+Team erreichen kann), Abpfiff liefert **Zusammenfassung + Ausblick** (Endstand im
+Kontext, Tabellen-/Turnierfolgen), A+W-Software-Witze deutlich reduziert, und der
+`Comeback`-Mood („Spiel gedreht") feuert korrekt, indem `Live.razor` die
+Rückstands-Historie je Team verfolgt (`Derive`-Flags `scorerAWasBehind/BWasBehind`).
+42 Tests grün.
 Details/History: `PLAN.md`.

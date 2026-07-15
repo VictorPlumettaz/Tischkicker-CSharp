@@ -154,6 +154,70 @@ public class MiraTests
         Assert.Contains("Rot", text);
     }
 
+    private static MiraContext? DeriveGoal(int prevA, int prevB, int curA, int curB,
+        bool aWasBehind = false, bool bWasBehind = false)
+    {
+        var prev = new Match { Id = 1, Status = MatchStatus.Live, ScoreA = prevA, ScoreB = prevB };
+        var cur = new Match { Id = 1, Status = MatchStatus.Live, ScoreA = curA, ScoreB = curB };
+        return MiraNarrator.Derive(prev, cur, null, id => id?.ToString() ?? "—", aWasBehind, bWasBehind);
+    }
+
+    [Fact]
+    public void Narrator_ScoringWhileStillTrailing_IsCloseGap()
+    {
+        // A führt 2:0, B verkürzt auf 2:1 → B liegt weiter hinten, keine Führung.
+        var ctx = DeriveGoal(2, 0, 2, 1);
+        Assert.Equal(MiraMood.CloseGap, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_ScoringToTie_IsEqualizer()
+    {
+        var ctx = DeriveGoal(1, 0, 1, 1);
+        Assert.Equal(MiraMood.Equalizer, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_TakingLeadFromTie_IsLead()
+    {
+        var ctx = DeriveGoal(1, 1, 2, 1);
+        Assert.Equal(MiraMood.Lead, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_ExtendingLead_IsExtend()
+    {
+        var ctx = DeriveGoal(1, 0, 2, 0);
+        Assert.Equal(MiraMood.Extend, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_LeadFromTieAfterTrailing_IsComeback()
+    {
+        // A lag zurück, glich aus (1:1) und geht jetzt 2:1 in Führung → Spiel gedreht.
+        var ctx = DeriveGoal(1, 1, 2, 1, aWasBehind: true);
+        Assert.Equal(MiraMood.Comeback, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_FirstLeadWithoutTrailing_IsLead()
+    {
+        // Ohne vorherigen Rückstand ist die Führung aus dem Gleichstand nur „Lead", kein Comeback.
+        var ctx = DeriveGoal(1, 1, 2, 1, aWasBehind: false);
+        Assert.Equal(MiraMood.Lead, ctx!.Mood);
+    }
+
+    [Fact]
+    public void Narrator_Finish_CarriesFinalScore()
+    {
+        var prev = new Match { Id = 1, Status = MatchStatus.Live, ScoreA = 3, ScoreB = 2 };
+        var cur = new Match { Id = 1, Status = MatchStatus.Finished, ScoreA = 3, ScoreB = 2 };
+        var ctx = MiraNarrator.Derive(prev, cur, null, id => id?.ToString() ?? "—");
+        Assert.Equal(MiraMood.Win, ctx!.Mood);
+        Assert.Equal(3, ctx.ScoreA);
+        Assert.Equal(2, ctx.ScoreB);
+    }
+
     [Fact]
     public void Tip_NeutralWhenClose()
     {

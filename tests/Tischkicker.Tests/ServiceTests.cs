@@ -141,6 +141,23 @@ public class SettingsServiceTests : IDisposable
     public void SetMiraConfig_RejectsUnknownModel()
         => Assert.Throws<ArgumentException>(() => _settings.SetMiraConfig(model: "gpt-4"));
 
+    [Fact]
+    public void MiraConfig_InterludeDefaultsAndPersists()
+    {
+        Assert.Equal(SettingsService.DefaultInterludeSec, _settings.GetMiraConfig().InterludeSec);
+
+        _settings.SetMiraConfig(interludeSec: 45);
+        Assert.Equal(45, _settings.GetMiraConfig().InterludeSec);
+        Assert.Equal(45, _settings.GetMiraConfigPublic().InterludeSec);
+    }
+
+    [Fact]
+    public void SetMiraConfig_RejectsInterludeOutOfRange()
+    {
+        Assert.Throws<ArgumentException>(() => _settings.SetMiraConfig(interludeSec: SettingsService.MinInterludeSec - 1));
+        Assert.Throws<ArgumentException>(() => _settings.SetMiraConfig(interludeSec: SettingsService.MaxInterludeSec + 1));
+    }
+
     public void Dispose() => _dbf.Dispose();
 }
 

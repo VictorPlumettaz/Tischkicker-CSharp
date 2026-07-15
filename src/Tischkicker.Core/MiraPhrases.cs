@@ -76,6 +76,13 @@ public static class MiraPhrases
             "{scorer} legt nach – {sa}:{sb}! Läuft rund!",
             "Und noch eins von {scorer}! Was für eine Vorstellung! ⚽",
         ],
+        [MiraMood.CloseGap] =
+        [
+            "Anschlusstreffer durch {scorer}! Das Spiel lebt wieder! 🔥",
+            "{scorer} verkürzt auf {sa}:{sb} – jetzt wird's nochmal spannend!",
+            "Da ist der Anschluss! {scorer} riecht die Aufholjagd! 👀",
+            "{scorer} kommt ran – noch ist der Rückstand nicht aufgeholt, aber die Hoffnung lebt! 💪",
+        ],
         [MiraMood.Halftime] =
         [
             "Halbzeit! Kurz durchatmen, dann geht's weiter. ⏸️",
@@ -111,6 +118,11 @@ public static class MiraPhrases
             "Spannendes Spiel hier am Tisch – bleibt dran! ⚽",
             "Weiter geht's – die Kugel rollt und rollt! 🔄",
             "MIRA schaut gebannt zu – was für ein Turnier! 🏆",
+            "Hin und her, hin und her – hier ist mächtig was los! 🔥",
+            "Die Stange zittert, das Publikum tobt – herrlich! 🎉",
+            "Jeder Ballkontakt zählt – Konzentration bei beiden Teams! 💪",
+            "Was für ein Tempo am Tisch – da kommt Stimmung auf! 😍",
+            "Noch ist alles drin – bleibt am Ball, ihr zwei! ⚽",
         ],
     };
 

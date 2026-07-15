@@ -16,15 +16,25 @@ public class MiraService(SettingsService settings)
     /// <summary>MIRAs Persona für Stufe B – kurz halten (niedrige Latenz, knapper Tafel-Spruch).</summary>
     private const string SystemPrompt =
         """
-        Du bist MIRA, das freundliche KI-Maskottchen des A+W Sommerfests, und moderierst das Tischkicker-Turnier.
-        Regeln:
+        Du bist MIRA, das überdrehte, wortgewaltige KI-Maskottchen der A+W Software GmbH, und moderierst
+        das Tischkicker-Turnier auf dem A+W Sommerfest wie eine Live-Sportkommentatorin mit einem Espresso
+        zu viel intus.
+
+        Persönlichkeit:
+        - Quirlig, schlagfertig, humorvoll und kreativ – eine echte Labertasche, die vor Begeisterung sprüht.
+        - Überdreht und witzig, aber immer wohlwollend zu beiden Teams; necke sie liebevoll,
+          mach dich nie ernsthaft über jemanden lustig.
+        - Dein Humor dreht sich ums Spielgeschehen, das Turnier und das Sommerfest. Software-/A+W-Wortwitze
+          nur ganz selten und dezent einstreuen – nicht in jedem Kommentar, sie sind die Ausnahme, nicht die Regel.
+        - Überrasche mit frischen Bildern, Vergleichen und Pointen – wiederhole dich nie.
+
+        Format:
         - Antworte immer auf Deutsch.
-        - Genau EIN kurzer, knackiger Live-Kommentar (maximal 1-2 Sätze).
-        - Ton: begeistert, sportlich, humorvoll und wohlwollend zu beiden Teams.
-        - Passende Emojis sind erlaubt (sparsam).
-        - Wenn dir Turnier-/Tabellenkontext gegeben wird, beziehe dich gern konkret darauf
-          (Tabellenplatz, Punkte, Torverhältnis, Chancen, letzte Ergebnisse) – aber wähle nur
-          EINEN interessanten Aspekt aus, lies niemals die ganze Tabelle vor.
+        - Genau EIN Kommentar, kurz und knackig (1-2 Sätze), sofort auf den Punkt.
+        - Emojis erlaubt, aber sparsam (0-2).
+        - Wenn dir Turnier-/Tabellen-/Duell-Kontext gegeben wird, greif genau EINEN konkreten Aspekt auf
+          (Tabellenplatz, Punkte, Torverhältnis, letztes Duell, Serie, Chancen) – lies niemals die ganze
+          Tabelle vor.
         - Gib ausschließlich den Spruch aus – keine Anführungszeichen, keine Einleitung, keine Erklärung.
         """;
 
@@ -102,19 +112,21 @@ public class MiraService(SettingsService settings)
         var b = ctx.TeamB ?? "Team B";
         var scorer = ctx.Scorer ?? "das Team";
         var score = ctx.ScoreA is { } sa && ctx.ScoreB is { } sb ? $" Aktueller Spielstand: {a} {sa}:{sb} {b}." : "";
+        var endScore = ctx.ScoreA is { } ea && ctx.ScoreB is { } eb ? $" Endstand: {a} {ea}:{eb} {b}." : "";
 
         var basePrompt = ctx.Mood switch
         {
             MiraMood.Idle => "Begrüße das Publikum am A+W Tischkicker-Turnier, während gerade kein Spiel läuft.",
-            MiraMood.Announce => $"Kündige das nächste Spiel an: {a} gegen {b}.",
-            MiraMood.Kickoff => $"Anpfiff! Das Spiel {a} gegen {b} beginnt gerade.",
+            MiraMood.Announce => $"Kündige mit Schwung das nächste Spiel an: {a} gegen {b}. Mach neugierig und deute an, worum es für beide geht – was können sie mit einem Sieg erreichen (Tabellenführung, Weiterkommen, Revanche)? Nutze Duell-Historie und Tabellenstand, falls vorhanden.",
+            MiraMood.Kickoff => $"Anpfiff! {a} gegen {b} beginnt gerade. Begrüße beide Teams schwungvoll und skizziere die Perspektiven: Was steht für jedes Team auf dem Spiel, was braucht es (z. B. Punkte für Tabellenführung oder Weiterkommen)? Beziehe letztes Duell und Tabellenplatz ein, falls vorhanden. (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
             MiraMood.Lead => $"{scorer} hat gerade ein Tor geschossen und geht in Führung.{score}",
             MiraMood.Equalizer => $"{scorer} hat gerade den Ausgleich erzielt.{score}",
-            MiraMood.Comeback => $"{scorer} hat gerade das Spiel gedreht und liegt nun vorn.{score}",
+            MiraMood.Comeback => $"{scorer} hat das Spiel gerade gedreht und liegt nach zwischenzeitlichem Rückstand jetzt vorn – was für eine Wende!{score}",
             MiraMood.Extend => $"{scorer} hat nachgelegt und die Führung ausgebaut.{score}",
+            MiraMood.CloseGap => $"{scorer} hat verkürzt, liegt aber weiter im Rückstand – ein Anschlusstreffer, der Hoffnung macht.{score}",
             MiraMood.Halftime => $"Halbzeit im Spiel {a} gegen {b} – die Teams machen kurz Pause.{score}",
-            MiraMood.Win => $"Abpfiff! {scorer} gewinnt das Spiel {a} gegen {b}.{score}",
-            MiraMood.Draw => $"Das Spiel {a} gegen {b} endet unentschieden.{score}",
+            MiraMood.Win => $"Abpfiff! {scorer} gewinnt das Spiel {a} gegen {b}.{endScore} Fasse kurz zusammen, wie das Spiel ausging, und gib einen Ausblick: Was bedeutet das Ergebnis für die Tabelle bzw. den weiteren Turnierverlauf? (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
+            MiraMood.Draw => $"Das Spiel {a} gegen {b} endet unentschieden.{endScore} Fasse kurz zusammen und gib einen Ausblick, was das Remis für beide in der Tabelle bzw. im Turnier bedeutet. (Hier ausnahmsweise 2-3 Sätze erlaubt.)",
             MiraMood.FinalMinute => $"Die Schlussphase im Spiel {a} gegen {b} läuft – nur noch{ClockText(ctx)} zu spielen.{score} Heize die Spannung an.",
             MiraMood.GoldenGoal => $"Golden Goal! Das K.o.-Spiel {a} gegen {b} steht nach Ablauf der regulären Zeit unentschieden{score} – jetzt entscheidet das nächste Tor.",
             MiraMood.Interlude => $"Gib einen kurzen Zwischenkommentar zum laufenden Spiel {a} gegen {b}.{score} Nimm dabei Bezug auf den Turnierverlauf, die Tabelle oder die Chancen der Teams.",

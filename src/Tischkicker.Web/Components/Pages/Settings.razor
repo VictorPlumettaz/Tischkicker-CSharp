@@ -34,6 +34,12 @@
             <input type="password" placeholder="@(_hasApiKey ? "••••••••••••••••" : "sk-ant-…")" @bind="_apiKey" autocomplete="off" />
         </label>
 
+        <label style="display:flex; flex-direction:column; gap:0.25rem">
+            <span class="muted">Abstand der Zwischenkommentare auf der Live-Tafel (Sekunden, @SettingsService.MinInterludeSec–@SettingsService.MaxInterludeSec)</span>
+            <input type="number" min="@SettingsService.MinInterludeSec" max="@SettingsService.MaxInterludeSec" step="5" @bind="_interludeSec" style="max-width:8rem" />
+            <span class="muted" style="font-size:0.8rem">MIRA meldet sich mindestens so oft mit einem Zwischenkommentar – außer es ist gerade ein Tor gefallen. Kleinere Werte = mehr API-Aufrufe.</span>
+        </label>
+
         <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center">
             <button class="btn-aw" @onclick="Save">Speichern</button>
             <button class="btn-ghost" @onclick="Test" disabled="@_testing">@(_testing ? "Teste…" : "Verbindung testen")</button>
@@ -54,6 +60,7 @@
     private string _model = SettingsService.DefaultModel;
     private string _apiKey = "";
     private bool _hasApiKey;
+    private int _interludeSec = SettingsService.DefaultInterludeSec;
 
     private bool _saved;
     private string? _error;
@@ -69,6 +76,7 @@
         _stageBEnabled = cfg.StageBEnabled;
         _model = cfg.Model;
         _hasApiKey = cfg.HasApiKey;
+        _interludeSec = cfg.InterludeSec;
     }
 
     private void Save()
@@ -77,7 +85,7 @@
         try
         {
             Cfg.SetMiraConfig(stageBEnabled: _stageBEnabled, model: _model,
-                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey);
+                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey, interludeSec: _interludeSec);
             _apiKey = "";
             Load();
             _saved = true;
@@ -99,7 +107,7 @@
         {
             // Erst speichern, damit Umschalter/Modell/Key aktuell sind; dann echten Aufruf.
             Cfg.SetMiraConfig(stageBEnabled: _stageBEnabled, model: _model,
-                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey);
+                apiKey: string.IsNullOrWhiteSpace(_apiKey) ? null : _apiKey, interludeSec: _interludeSec);
             _apiKey = "";
             Load();
             var (ok, text, err) = await Mira.TestConnectionAsync();

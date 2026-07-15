@@ -39,6 +39,8 @@ public enum MiraMood
     Equalizer,
     Comeback,
     Extend,
+    /// <summary>Anschlusstreffer: Torschütze verkürzt, liegt aber weiter im Rückstand.</summary>
+    CloseGap,
     Halftime,
     Win,
     Draw,

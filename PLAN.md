@@ -77,13 +77,37 @@ Anthropic C#-SDK mit automatischem Fallback; DB unter `%LOCALAPPDATA%\Tischkicke
   Kommentar kompakten Turnierkontext (Tabelle, letzte Ergebnisse, offene Spiele);
   `MiraContext` um `RemainingSec`/`Half`/`Halves`/`Situation` erweitert, neue
   Moods `FinalMinute`/`GoldenGoal`/`Interlude` (Stufe A + B).
+- ✅ **MIRA-Persona & -Ausbau**: Stufe-B-System-Prompt zur überdrehten, witzigen
+  A+W-Labertasche umgeschrieben (Software-/A+W-Wortwitze). Anpfiff-/Ankündigungs-
+  Prompts nutzen aktiv die **Duell-Historie** – `BuildSituation` liefert jetzt
+  turnierübergreifendes Head-to-Head (Bilanz + letztes Ergebnis) der aktuellen
+  Paarung. Zwischenkommentare von 2 Min → **30 s** verdichtet; `_lastInterludeMs`
+  wird nach *jedem* Kommentar zurückgesetzt (kein Zwischenkommentar direkt nach
+  einem Tor). Der Abstand ist über die **MIRA-Settings** einstellbar
+  (`mira.interludeSec`, 10–600 s, Standard 30 s): neuer Wert in `MiraConfig`/
+  `MiraConfigPublic`, Validierung in `SetMiraConfig`, Eingabefeld auf
+  `Settings.razor`, `Live.razor` liest ihn bei jedem Reload frisch.
+  **Bugfix:** neuer Mood `CloseGap` (Anschlusstreffer) in
+  `MiraNarrator` – Verkürzen aus dem Rückstand (z. B. 2:0 → 2:1) meldete fälschlich
+  „geht in Führung"; Klassifikation korrigiert (Endstand aus Schützensicht zuerst).
+- ✅ **MIRA-Kommentar-Feinschliff**: Anpfiff (Kickoff/Announce) nennt jetzt die
+  **Perspektiven** (welches Team was mit Sieg/Punkt erreichen kann); Abpfiff
+  (Win/Draw) liefert **Zusammenfassung + Ausblick** samt Endstand (Win/Draw tragen
+  jetzt `ScoreA/ScoreB`). A+W-Software-Witze im System-Prompt + Offline-Interlude-
+  Pool deutlich zurückgefahren. **„Spiel gedreht":** `Comeback` feuert jetzt auch
+  beim Führungstor aus dem Gleichstand, wenn der Schütze zuvor zurücklag –
+  `MiraNarrator.Derive` erhält Flags `scorerAWasBehind/scorerBWasBehind`,
+  `Live.razor` pflegt die Rückstands-Historie je laufendem Spiel.
 
 ## Verifikation
 
-- `dotnet build` + `dotnet test` grün (**33 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
+- `dotnet build` + `dotnet test` grün (**42 Tests**: ELO-Werte, 3-1-0-Tiebreaker,
   `CorrectResult`-Flip, Uhr-Clamp, `ResetResults`, K.o.-Reset erhält Freilos-Teams,
   Golden-Goal-Sperre (K.o.-Remis wirft, Liga-Remis erlaubt), `UpdateTournament`,
-  `SettingsService`, `includeLive` (laufendes Spiel zählt mit / geplante nicht)).
+  `SettingsService` (inkl. `interludeSec`-Persistenz + Bereichsprüfung),
+  `includeLive` (laufendes Spiel zählt mit / geplante nicht),
+  `MiraNarrator`-Mood-Klassifikation (CloseGap/Equalizer/Lead/Extend/Comeback nach
+  Rückstand, Endstand bei Abpfiff)).
 - End-to-End geprüft: Boot/Migration, alle Routen 200, `--seed`, Live-Tafel,
   Ruhe-Ansicht mit Spielplan, publizierte `.exe` inkl. Static Assets. Zuletzt
   bestätigt: Live-Tabelle zählt ein laufendes Gruppenspiel provisorisch mit.
